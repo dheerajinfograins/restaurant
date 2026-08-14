@@ -1,0 +1,302 @@
+// =============================
+// Prisma Client Generator
+// =============================
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =============================
+// Database Connection
+// =============================
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================
+// ENUMS
+// =============================
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  MANAGER
+  WAITER
+  KITCHEN
+  CASHIER
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+// =============================
+// RESTAURANT
+// =============================
+
+model Restaurant {
+  id       String  @id @default(cuid())
+  name     String
+  email    String  @unique
+  phone    String  @unique
+  address      String
+  city         String?
+  state        String?
+  country      String?
+  pincode      String?
+  website      String?
+  description  String?
+  logo         String?
+  coverImage   String?
+  isActive     Boolean @default(true)
+
+  settings   RestaurantSettings?
+  users      User[]
+  tables     RestaurantTable[]
+  categories Category[]
+  orders     Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("restaurants")
+}
+
+// =============================
+// USER
+// =============================
+
+model User {
+  id String @id @default(cuid())
+
+  name     String
+  email    String  @unique
+  phone    String? @unique
+  password String
+
+  role UserRole
+
+  isActive Boolean @default(true)
+
+  restaurantId String?
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders     Order[]
+
+  lastLoginAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([restaurantId])
+  @@map("users")
+}
+
+// =============================
+// RESTAURANT TABLE
+// =============================
+
+model RestaurantTable {
+  id String @id @default(cuid())
+
+  tableNumber String
+
+  capacity Int
+
+  qrCode String?
+
+  status TableStatus @default(AVAILABLE)
+
+  restaurantId String
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders     Order[]
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([restaurantId, tableNumber])
+  @@index([restaurantId])
+  @@map("restaurant_tables")
+}
+
+// =============================
+// CATEGORY
+// =============================
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Category {
+  id           String         @id @default(cuid())
+  restaurantId String
+  name         String
+  slug         String         @unique
+  image        String?
+  description  String?
+  sortOrder    Int            @default(0)
+  status       CategoryStatus @default(ACTIVE)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  products   Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([restaurantId, name])
+  @@index([restaurantId])
+  @@map("categories")
+}
+
+// =============================
+// PRODUCT
+// =============================
+
+enum FoodType {
+  VEG
+  NON_VEG
+  EGG
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  restaurantId    String
+  categoryId      String
+  name            String
+  slug            String
+  description     String?
+  price           Float
+  discount        Float    @default(0)
+  image           String?
+  foodType        FoodType @default(VEG)
+  isAvailable     Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
+  preparationTime Int? // in minutes
+  ingredients     Json?
+  recipeInstructions Json?
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([restaurantId, slug])
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+// =============================
+// ORDERS
+// =============================
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY
+  SERVED
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  UPI
+  CARD
+}
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  customerName  String
+  customerPhone String
+  notes         String?
+  totalAmount   Decimal     @db.Decimal(10, 2)
+  status        OrderStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+  tableId       String
+  restaurantId  String
+  waiterId      String?
+
+  table      RestaurantTable @relation(fields: [tableId], references: [id])
+  restaurant Restaurant      @relation(fields: [restaurantId], references: [id])
+  waiter     User?           @relation(fields: [waiterId], references: [id])
+
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([tableId])
+  @@index([restaurantId])
+  @@index([waiterId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  productId  String
+  quantity   Int
+  unitPrice  Decimal @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// =============================
+// RESTAURANT SETTINGS
+// =============================
+
+model RestaurantSettings {
+  id              String   @id @default(cuid())
+  restaurantId    String   @unique
+
+  // Tax & Billing
+  taxPercentage   Float    @default(0)
+  serviceCharge   Float    @default(0)
+  currency        String   @default("INR")
+  gstNumber       String?
+  invoicePrefix   String   @default("INV-")
+
+  // Opening Hours (Stored as JSON for flexible Mon-Sun configuration)
+  openingHours    Json?
+  isRestaurantOpen Boolean @default(true) // quick toggle
+
+  // Order Settings
+  acceptOnlineOrders Boolean @default(true)
+  autoAcceptOrders   Boolean @default(false)
+  allowCustomerNotes Boolean @default(true)
+  allowItemQuantity  Boolean @default(true)
+  maxOrderAmount     Float   @default(10000)
+
+  // QR / Menu Settings
+  qrMenuStatus      Boolean @default(true)
+  qrShowLogo        Boolean @default(true)
+  qrShowImages      Boolean @default(true)
+  qrShowRatings     Boolean @default(true) // if ratings feature exists
+  qrShowPrices      Boolean @default(true)
+  showVegNonVeg     Boolean @default(true)
+  showFeaturedItems Boolean @default(true)
+  allowOrdering     Boolean @default(true)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("restaurant_settings")
+}
