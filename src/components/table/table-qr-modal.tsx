@@ -40,11 +40,10 @@ export default function TableQrModal({ table, isOpen, onClose, restaurantName: p
   const activeRestaurantName =
     propRestaurantName || table.restaurant?.name || fetchedRestaurantName || "Restaurant Menu";
 
-  const targetUrl = `${
-    typeof window !== "undefined" && window.location.origin
+  const targetUrl = `${typeof window !== "undefined" && window.location.origin
       ? window.location.origin
       : process.env.NEXT_PUBLIC_APP_URL || "https://localhost:3000"
-  }/menu/${table.id}`;
+    }/menu/${table.id}`;
 
   const handleCopyLink = async () => {
     try {

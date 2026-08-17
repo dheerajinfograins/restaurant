@@ -17,7 +17,7 @@ export async function PATCH(request: NextRequest) {
     // Execute all updates in a transaction
     const updatePromises = categories.map(cat => 
       prisma.category.update({
-        where: { id: cat.id, restaurantId: payload.restaurantId },
+        where: { id: cat.id, restaurantId: payload.restaurantId ?? undefined },
         data: { sortOrder: cat.sortOrder }
       })
     );

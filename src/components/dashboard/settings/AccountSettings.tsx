@@ -3,16 +3,14 @@
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { 
-  UserCircle, 
-  KeyRound, 
-  Save, 
-  Eye, 
-  EyeOff, 
-  Mail, 
-  Phone, 
+import {
+  UserCircle,
+  KeyRound,
+  Save,
+  Eye,
+  EyeOff,
+  Mail,
   User,
-  ShieldCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +48,7 @@ export default function AccountSettings({ refresh }: { readonly refresh: () => v
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -69,7 +67,7 @@ export default function AccountSettings({ refresh }: { readonly refresh: () => v
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        
+
         {/* Profile Card */}
         <div className="bg-gray-50/70 rounded-2xl border border-gray-200/80 p-5 space-y-4 text-xs">
           <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">

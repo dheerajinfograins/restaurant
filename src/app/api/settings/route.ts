@@ -3,10 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function GET() {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+
+    if (!payload.restaurantId) {
+      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
+    }
 
     // Fetch Restaurant Profile
     const restaurant = await prisma.restaurant.findUnique({
@@ -17,7 +22,7 @@ export async function GET() {
     });
 
     if (!restaurant) {
-      throw new Error("Restaurant not found");
+      throw new AppError("Restaurant not found", HTTP_STATUS.NOT_FOUND);
     }
 
     // If settings don't exist yet, create default settings

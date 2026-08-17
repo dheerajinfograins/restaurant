@@ -4,10 +4,16 @@ import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
 import { Prisma } from "@prisma/client";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function PATCH(request: NextRequest) {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+
+    if (!payload.restaurantId) {
+      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
+    }
+
     const body = await request.json();
 
     // Check if settings exist, if not create them

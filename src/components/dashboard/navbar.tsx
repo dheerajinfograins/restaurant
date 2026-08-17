@@ -17,13 +17,15 @@ import { sidebarLinks } from "./sidebar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+interface NavbarProps {
+  user?: { name: string; email: string; role: string };
+  restaurantName?: string;
+}
+
 export default function Navbar({
   user = { name: "Admin", email: "admin@example.com", role: "SUPER_ADMIN" },
   restaurantName = "Culinary Ledger",
-}: {
-  user?: { name: string; email: string; role: string };
-  restaurantName?: string;
-}) {
+}: Readonly<NavbarProps>) {
   const pathname = usePathname();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");

@@ -25,7 +25,6 @@ export async function GET(request: Request) {
       },
     });
 
-    const now = new Date();
     const startDate = new Date();
     let endDate = new Date();
     endDate.setHours(23, 59, 59, 999);
@@ -121,7 +120,12 @@ export async function GET(request: Request) {
       });
     } else {
       // Group by day
-      const chartDays = range === "last30" || range === "this_month" ? 30 : range === "all" ? 14 : 7;
+      let chartDays = 7;
+      if (range === "last30" || range === "this_month") {
+        chartDays = 30;
+      } else if (range === "all") {
+        chartDays = 14;
+      }
       const daysArray = Array.from({ length: chartDays }).map((_, i) => {
         const d = new Date();
         d.setDate(d.getDate() - (chartDays - 1 - i));

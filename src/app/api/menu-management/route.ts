@@ -3,10 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function GET() {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+
+    if (!payload.restaurantId) {
+      throw new AppError("No restaurant associated with this user", HTTP_STATUS.BAD_REQUEST);
+    }
 
     // Fetch Categories with products count
     const categories = await prisma.category.findMany({

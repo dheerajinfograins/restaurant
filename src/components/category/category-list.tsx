@@ -1,33 +1,30 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import Image from "next/image";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { 
-  Plus, 
-  Search, 
-  Edit3, 
-  Trash2, 
-  Folder, 
+import {
+  Plus,
+  Search,
+  Edit3,
+  Trash2,
+  Folder,
   RotateCw,
-  Utensils, 
-  CheckCircle2, 
-  XCircle, 
-  Filter, 
-  ChevronsLeft, 
-  ChevronLeft, 
-  ChevronRight, 
+  Utensils,
+  CheckCircle2,
+  XCircle,
+  Filter,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
   ChevronsRight,
   Layers,
-  Sparkles,
   Calendar,
-  Image as ImageIcon
 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { ICategory } from "@/modules/category/types";
 import { CategoryFormModal } from "./category-form-modal";
@@ -55,8 +52,7 @@ export function CategoryList() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ICategory | null>(null);
 
-  const fetchCategories = async (showIndicator = false) => {
-    if (showIndicator) setIsRefreshing(true);
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get("/api/categories");
       setCategories(response.data.data || []);
@@ -65,13 +61,22 @@ export function CategoryList() {
       toast.error("Failed to load menu categories");
     } finally {
       setIsLoading(false);
-      if (showIndicator) setIsRefreshing(false);
     }
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchCategories();
+    setIsRefreshing(false);
   };
 
   useEffect(() => {
-    void fetchCategories();
-  }, []);
+    const loadCategories = async () => {
+      await fetchCategories();
+    };
+
+    void loadCategories();
+  }, [fetchCategories]);
 
   const handleAdd = () => {
     setSelectedCategory(null);
@@ -103,7 +108,8 @@ export function CategoryList() {
         status: newStatus,
       });
       toast.success(`${category.name} is now ${newStatus === "ACTIVE" ? "Active" : "Inactive"}`);
-    } catch (error: any) {
+    } catch (error) {
+      console.error("Failed to update category status:", error);
       // Revert on error
       setCategories((prev) =>
         prev.map((c) => (c.id === category.id ? { ...c, status: category.status } : c))
@@ -149,17 +155,13 @@ export function CategoryList() {
       if (!matchesStatus) return false;
 
       if (!q) return true;
-      return (
+      return Boolean(
         cat.name.toLowerCase().includes(q) ||
-        (cat.description && cat.description.toLowerCase().includes(q))
+        cat.description?.toLowerCase().includes(q)
       );
     });
   }, [categories, statusFilter, searchQuery]);
 
-  // Reset page when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, pageSize]);
 
   // Pagination calculation
   const totalItems = filteredCategories.length;
@@ -209,7 +211,7 @@ export function CategoryList() {
 
   return (
     <div className="space-y-6 font-sans pb-16">
-      
+
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Categories */}
@@ -271,11 +273,11 @@ export function CategoryList() {
 
       {/* Main Table Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-culinary-border/40 overflow-hidden">
-        
+
         {/* Top Control Bar */}
         <div className="p-5 border-b border-gray-100 space-y-4">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            
+
             {/* Search Input */}
             <div className="relative w-full lg:w-96">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -283,12 +285,18 @@ export function CategoryList() {
                 type="text"
                 placeholder="Search categories by name, description..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-9 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 focus:border-culinary-primary transition-all placeholder:text-gray-400 text-gray-800"
               />
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
+                <button type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200/80 rounded-full w-4 h-4 flex items-center justify-center"
                 >
                   ✕
@@ -302,7 +310,7 @@ export function CategoryList() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => fetchCategories(true)}
+                onClick={() => void handleRefresh()}
                 disabled={isRefreshing}
                 className="text-xs h-9 gap-1.5 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl shadow-none"
               >
@@ -330,20 +338,21 @@ export function CategoryList() {
               const count = filterCounts[tab.value] || 0;
               const isSelected = statusFilter === tab.value;
               return (
-                <button
+                <button type="button"
                   key={tab.value}
-                  onClick={() => setStatusFilter(tab.value)}
-                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-culinary-primary text-white shadow-sm font-semibold"
-                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/70"
-                  }`}
+                  onClick={() => {
+                    setStatusFilter(tab.value);
+                    setCurrentPage(1);
+                  }}
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${isSelected
+                    ? "bg-culinary-primary text-white shadow-sm font-semibold"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/70"
+                    }`}
                 >
                   {tab.label}
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isSelected ? "bg-white/20 text-white" : "bg-white text-gray-600 border border-gray-200"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? "bg-white/20 text-white" : "bg-white text-gray-600 border border-gray-200"
+                      }`}
                   >
                     {count}
                   </span>
@@ -399,10 +408,12 @@ export function CategoryList() {
                           {/* Image or Monogram */}
                           <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 overflow-hidden shrink-0 border border-amber-200/70 shadow-sm flex items-center justify-center">
                             {category.image ? (
-                              <img
+                              <Image
                                 src={category.image}
                                 alt={category.name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                fill
+                                sizes="48px"
+                                className="object-cover group-hover:scale-105 transition-transform duration-300"
                               />
                             ) : (
                               <span className="font-bold text-culinary-primary font-cormorant text-base">
@@ -448,9 +459,8 @@ export function CategoryList() {
                             onCheckedChange={() => handleToggleStatus(category)}
                           />
                           <span
-                            className={`text-[11px] font-bold ${
-                              isActive ? "text-emerald-600" : "text-gray-400"
-                            }`}
+                            className={`text-[11px] font-bold ${isActive ? "text-emerald-600" : "text-gray-400"
+                              }`}
                           >
                             {isActive ? "Active" : "Hidden"}
                           </span>
@@ -504,7 +514,10 @@ export function CategoryList() {
                 <span className="font-medium">Per page:</span>
                 <select
                   value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
                   className="bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
                 >
                   <option value={5}>5</option>
@@ -557,14 +570,13 @@ export function CategoryList() {
                   const pageNum = Number(p);
                   const isCurrent = pageNum === safeCurrentPage;
                   return (
-                    <button
+                    <button type="button"
                       key={`page-${pageNum}`}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${
-                        isCurrent
-                          ? "bg-culinary-primary text-white shadow-sm"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                      }`}
+                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
+                        ? "bg-culinary-primary text-white shadow-sm"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                        }`}
                     >
                       {pageNum}
                     </button>

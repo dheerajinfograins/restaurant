@@ -6,29 +6,23 @@ import {
   ChefHat,
   Clock,
   Info,
-  CheckCircle2,
   Utensils,
-  BookOpen,
-  Sparkles,
-  Layers,
-  Flame
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface Product {
+export interface Product {
   id: string;
   name: string;
   foodType?: string;
   description: string | null;
   preparationTime: number | null;
-  ingredients: any;
-  recipeInstructions: any;
-  category: {
+  ingredients?: unknown;
+  recipeInstructions?: unknown;
+  category?: {
     name: string;
-  };
+  } | null;
 }
 
-export function PrepGuideClient({ products }: { products: Product[] }) {
+export function PrepGuideClient({ products }: Readonly<{ products: Product[] }>) {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(
@@ -66,10 +60,10 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
 
   return (
     <div className="space-y-6 font-sans">
-      
+
       {/* 2-Column Master-Detail Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Left Sidebar List (1 col) */}
         <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm flex flex-col overflow-hidden col-span-1 max-h-[750px]">
           <div className="p-4 border-b border-gray-100 bg-gray-50/70 space-y-3">
@@ -83,7 +77,7 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
                 className="w-full pl-8 pr-8 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 bg-white text-gray-800"
               />
               {search && (
-                <button
+                <button type="button"
                   onClick={() => setSearch("")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
                 >
@@ -97,11 +91,10 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
               <button
                 type="button"
                 onClick={() => setSelectedCategory("ALL")}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
-                  selectedCategory === "ALL"
-                    ? "bg-culinary-primary text-white"
-                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
-                }`}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${selectedCategory === "ALL"
+                  ? "bg-culinary-primary text-white"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                  }`}
               >
                 All ({products.length})
               </button>
@@ -110,11 +103,10 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
                   type="button"
                   key={c}
                   onClick={() => setSelectedCategory(c)}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
-                    selectedCategory === c
-                      ? "bg-culinary-primary text-white"
-                      : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${selectedCategory === c
+                    ? "bg-culinary-primary text-white"
+                    : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-100"
+                    }`}
                 >
                   {c}
                 </button>
@@ -138,19 +130,17 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
                     key={product.id}
                     type="button"
                     onClick={() => setSelectedProduct(product)}
-                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between gap-2.5 ${
-                      isSelected
-                        ? "bg-amber-50 text-culinary-primary font-bold border border-amber-200 shadow-sm"
-                        : "hover:bg-gray-50 text-gray-800"
-                    }`}
+                    className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between gap-2.5 ${isSelected
+                      ? "bg-amber-50 text-culinary-primary font-bold border border-amber-200 shadow-sm"
+                      : "hover:bg-gray-50 text-gray-800"
+                      }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
                       <div
-                        className={`w-8 h-8 rounded-lg font-bold text-xs flex items-center justify-center font-cormorant shrink-0 ${
-                          isSelected
-                            ? "bg-culinary-primary text-white"
-                            : "bg-gray-100 text-gray-600 border border-gray-200"
-                        }`}
+                        className={`w-8 h-8 rounded-lg font-bold text-xs flex items-center justify-center font-cormorant shrink-0 ${isSelected
+                          ? "bg-culinary-primary text-white"
+                          : "bg-gray-100 text-gray-600 border border-gray-200"
+                          }`}
                       >
                         {monogram}
                       </div>
@@ -176,7 +166,7 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
         <div className="col-span-1 lg:col-span-2">
           {selectedProduct ? (
             <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col space-y-6 p-6">
-              
+
               {/* Header */}
               <div className="bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-transparent p-5 rounded-2xl border border-amber-200/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="space-y-1">
@@ -206,12 +196,12 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
                 </h3>
 
                 {selectedProduct.ingredients &&
-                Array.isArray(selectedProduct.ingredients) &&
-                selectedProduct.ingredients.length > 0 ? (
+                  Array.isArray(selectedProduct.ingredients) &&
+                  selectedProduct.ingredients.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {selectedProduct.ingredients.map((ing: string, i: number) => (
+                    {(selectedProduct.ingredients as string[]).map((ing: string, i: number) => (
                       <div
-                        key={i}
+                        key={ing}
                         className="flex items-center gap-2.5 p-3 rounded-xl bg-gray-50/80 border border-gray-200/80 text-xs font-medium text-gray-800"
                       >
                         <span className="w-5 h-5 rounded-full bg-amber-100 text-culinary-primary font-bold text-[10px] flex items-center justify-center shrink-0">
@@ -235,12 +225,12 @@ export function PrepGuideClient({ products }: { products: Product[] }) {
                 </h3>
 
                 {selectedProduct.recipeInstructions &&
-                Array.isArray(selectedProduct.recipeInstructions) &&
-                selectedProduct.recipeInstructions.length > 0 ? (
+                  Array.isArray(selectedProduct.recipeInstructions) &&
+                  selectedProduct.recipeInstructions.length > 0 ? (
                   <div className="space-y-3">
-                    {selectedProduct.recipeInstructions.map((step: string, i: number) => (
+                    {(selectedProduct.recipeInstructions as string[]).map((step: string, i: number) => (
                       <div
-                        key={i}
+                        key={step}
                         className="bg-white p-4 rounded-xl border border-gray-200/80 shadow-sm flex gap-3.5 items-start"
                       >
                         <div className="w-7 h-7 rounded-xl bg-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-sm">

@@ -1,26 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { 
-  CheckCircle2, 
-  Clock, 
-  ChefHat, 
-  BellRing, 
-  UtensilsCrossed, 
-  QrCode, 
-  Banknote, 
-  CreditCard, 
-  Receipt, 
-  PhoneCall, 
+import {
+  CheckCircle2,
+  Clock,
+  ChefHat,
+  BellRing,
+  UtensilsCrossed,
+  QrCode,
+  Banknote,
+  CreditCard,
+  Receipt,
   Sparkles,
   ArrowLeft,
   Copy,
   Check,
-  Flame,
-  Coffee,
-  HelpCircle,
   Bell
 } from "lucide-react";
 import { OrderCountdown } from "./order-countdown";
@@ -225,8 +220,28 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
     }
   };
 
+  const getPaymentDetails = (method?: PaymentMethod | null) => {
+    if (method === "CARD") {
+      return {
+        icon: <CreditCard size={20} className="text-blue-600" />,
+        label: "Debit / Credit Card",
+      };
+    }
+    if (method === "CASH") {
+      return {
+        icon: <Banknote size={20} className="text-emerald-600" />,
+        label: "Cash at Table",
+      };
+    }
+    return {
+      icon: <QrCode size={20} className="text-purple-600" />,
+      label: "UPI QR Payment",
+    };
+  };
+
   const heroInfo = getHeroStatusInfo(order.status);
   const isDarkHero = order.status === "PAID";
+  const paymentDetails = getPaymentDetails(order.paymentMethod);
 
   return (
     <div className="space-y-5 animate-in fade-in-50 duration-300">
@@ -299,17 +314,15 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
             </span>
 
             <h2
-              className={`text-xl sm:text-2xl font-bold font-cormorant leading-tight ${
-                isDarkHero ? "text-white" : "text-stone-900"
-              }`}
+              className={`text-xl sm:text-2xl font-bold font-cormorant leading-tight ${isDarkHero ? "text-white" : "text-stone-900"
+                }`}
             >
               {heroInfo.title}
             </h2>
 
             <p
-              className={`text-xs mt-1 max-w-xs mx-auto ${
-                isDarkHero ? "text-gray-300" : "text-gray-600"
-              }`}
+              className={`text-xs mt-1 max-w-xs mx-auto ${isDarkHero ? "text-gray-300" : "text-gray-600"
+                }`}
             >
               {heroInfo.description}
             </p>
@@ -336,8 +349,8 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
               <span>Live Order Tracker</span>
             </h3>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Auto-updating
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Auto-updating</span>
             </span>
           </div>
 
@@ -345,53 +358,57 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
             {steps.map((step, index) => {
               const isCompleted = step.completedFor.includes(order.status);
               const isActive = step.activeFor.includes(order.status) && !isCompleted;
-              const isPending = !isCompleted && !isActive;
               const Icon = step.icon;
+
+              let iconStyle = "bg-gray-50 border-gray-200 text-gray-400";
+              if (isCompleted) {
+                iconStyle = "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/20";
+              } else if (isActive) {
+                iconStyle = "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/30 scale-105 animate-pulse";
+              }
+
+              let cardStyle = "bg-gray-50/50 border-gray-100 opacity-70";
+              if (isActive) {
+                cardStyle = "bg-amber-50/70 border-amber-200 shadow-2xs";
+              } else if (isCompleted) {
+                cardStyle = "bg-emerald-50/30 border-emerald-100";
+              }
+
+              let titleStyle = "text-gray-400";
+              if (isActive) {
+                titleStyle = "text-amber-950 font-cormorant text-base";
+              } else if (isCompleted) {
+                titleStyle = "text-emerald-950 font-medium";
+              }
+
+              let descStyle = "text-gray-400";
+              if (isActive) {
+                descStyle = "text-amber-900/80 font-medium";
+              } else if (isCompleted) {
+                descStyle = "text-gray-500";
+              }
 
               return (
                 <div key={step.id} className="relative flex items-start gap-4 group">
                   {/* Vertical Connecting Line */}
                   {index < steps.length - 1 && (
                     <div
-                      className={`absolute left-5 top-10 bottom-0 w-0.5 -translate-x-1/2 transition-colors duration-300 ${
-                        isCompleted ? "bg-emerald-500" : "bg-gray-200"
-                      }`}
+                      className={`absolute left-5 top-10 bottom-0 w-0.5 -translate-x-1/2 transition-colors duration-300 ${isCompleted ? "bg-emerald-500" : "bg-gray-200"
+                        }`}
                     />
                   )}
 
                   {/* Icon Circle */}
                   <div
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 transition-all duration-300 z-10 ${
-                      isCompleted
-                        ? "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/20"
-                        : isActive
-                        ? "bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-500/30 scale-105 animate-pulse"
-                        : "bg-gray-50 border-gray-200 text-gray-400"
-                    }`}
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 transition-all duration-300 z-10 ${iconStyle}`}
                   >
                     {isCompleted ? <CheckCircle2 size={18} /> : <Icon size={18} />}
                   </div>
 
                   {/* Step Title & Details Card */}
-                  <div
-                    className={`flex-1 p-3 rounded-2xl border transition-all ${
-                      isActive
-                        ? "bg-amber-50/70 border-amber-200 shadow-2xs"
-                        : isCompleted
-                        ? "bg-emerald-50/30 border-emerald-100"
-                        : "bg-gray-50/50 border-gray-100 opacity-70"
-                    }`}
-                  >
+                  <div className={`flex-1 p-3 rounded-2xl border transition-all ${cardStyle}`}>
                     <div className="flex items-center justify-between">
-                      <h4
-                        className={`text-sm font-bold leading-tight ${
-                          isActive
-                            ? "text-amber-950 font-cormorant text-base"
-                            : isCompleted
-                            ? "text-emerald-950 font-medium"
-                            : "text-gray-400"
-                        }`}
-                      >
+                      <h4 className={`text-sm font-bold leading-tight ${titleStyle}`}>
                         {step.title}
                       </h4>
 
@@ -407,15 +424,7 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
                       )}
                     </div>
 
-                    <p
-                      className={`text-xs mt-0.5 ${
-                        isActive
-                          ? "text-amber-900/80 font-medium"
-                          : isCompleted
-                          ? "text-gray-500"
-                          : "text-gray-400"
-                      }`}
-                    >
+                    <p className={`text-xs mt-0.5 ${descStyle}`}>
                       {step.desc}
                     </p>
                   </div>
@@ -431,13 +440,7 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
         <section className="bg-white p-5 rounded-3xl shadow-xs border border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200/70 flex items-center justify-center text-culinary-primary">
-              {order.paymentMethod === "CARD" ? (
-                <CreditCard size={20} className="text-blue-600" />
-              ) : order.paymentMethod === "CASH" ? (
-                <Banknote size={20} className="text-emerald-600" />
-              ) : (
-                <QrCode size={20} className="text-purple-600" />
-              )}
+              {paymentDetails.icon}
             </div>
 
             <div>
@@ -445,11 +448,7 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
                 Payment Method
               </span>
               <span className="text-sm font-bold text-stone-900">
-                {order.paymentMethod === "CARD"
-                  ? "Debit / Credit Card"
-                  : order.paymentMethod === "CASH"
-                  ? "Cash at Table"
-                  : "UPI QR Payment"}
+                {paymentDetails.label}
               </span>
             </div>
           </div>
@@ -534,11 +533,10 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
             type="button"
             onClick={handleCallWaiter}
             disabled={waiterCalled}
-            className={`py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all text-center ${
-              waiterCalled
-                ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
-                : "bg-gray-900 hover:bg-black text-white shadow-gray-900/10"
-            }`}
+            className={`py-3.5 px-4 rounded-2xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs active:scale-95 transition-all text-center ${waiterCalled
+              ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+              : "bg-gray-900 hover:bg-black text-white shadow-gray-900/10"
+              }`}
           >
             <Bell size={16} />
             <span>{waiterCalled ? "Staff Alerted" : "Call Waiter"}</span>

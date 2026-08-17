@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
-import { UtensilsCrossed, Sparkles, MapPin, Users } from "lucide-react";
+import { UtensilsCrossed, Users } from "lucide-react";
 import { MenuClientInit } from "@/components/customer/menu-client";
 import { ProductListClient } from "./product-list-client";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Edit3, QrCode, Trash2, Users, Utensils, Sparkles, CheckCircle2, ChevronDown } from "lucide-react";
+import { Edit3, QrCode, Trash2, Users, Utensils, CheckCircle2, ChevronDown } from "lucide-react";
 import { RestaurantTable } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCartStore } from "@/store/cart-store";
-import { ArrowLeft, Minus, Plus, Trash2, UtensilsCrossed, Sparkles, ChevronRight, Receipt, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, UtensilsCrossed, ChevronRight, Receipt, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -34,7 +34,7 @@ export function CartClient() {
         <p className="text-xs sm:text-sm text-gray-500 max-w-xs mb-8 leading-relaxed">
           Looks like you haven&apos;t added any delicious dishes yet. Explore our handcrafted menu!
         </p>
-        <Link 
+        <Link
           href={tableId ? `/menu/${tableId}` : "/"}
           className="px-8 py-3.5 bg-culinary-primary hover:bg-culinary-primary/90 text-white rounded-2xl font-bold text-sm shadow-md shadow-culinary-primary/25 active:scale-95 transition-all flex items-center gap-2"
         >
@@ -78,9 +78,9 @@ export function CartClient() {
       {/* Header Bar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-2xs px-5 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button 
-            type="button" 
-            onClick={() => router.back()} 
+          <button
+            type="button"
+            onClick={() => router.back()}
             className="w-10 h-10 rounded-2xl bg-amber-50 hover:bg-amber-100 text-culinary-primary flex items-center justify-center border border-amber-200/70 transition-all active:scale-95 shadow-2xs"
             aria-label="Go Back"
           >
@@ -103,7 +103,7 @@ export function CartClient() {
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Order Items</h2>
-            <Link 
+            <Link
               href={tableId ? `/menu/${tableId}` : "/"}
               className="text-xs font-bold text-culinary-primary hover:underline flex items-center gap-0.5"
             >
@@ -112,19 +112,19 @@ export function CartClient() {
           </div>
 
           {items.map((item) => (
-            <div 
-              key={item.id} 
+            <div
+              key={item.id}
               className="bg-white p-3.5 rounded-3xl shadow-xs border border-gray-100 hover:border-amber-200/80 transition-all flex gap-3.5 relative overflow-hidden group"
             >
               {/* Dish Image Thumbnail */}
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/40 relative overflow-hidden shrink-0 border border-gray-100">
                 {item.image ? (
-                  <Image 
-                    src={item.image} 
-                    alt={item.name} 
-                    fill 
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
                     sizes="80px"
-                    className="object-cover group-hover:scale-105 transition-transform duration-300" 
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-amber-700/40 gap-0.5">
@@ -133,7 +133,7 @@ export function CartClient() {
                   </div>
                 )}
               </div>
-              
+
               {/* Item Info */}
               <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
                 <div className="flex justify-between items-start gap-2">
@@ -149,8 +149,8 @@ export function CartClient() {
                     </span>
                   </div>
 
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => removeItem(item.id)}
                     className="w-7 h-7 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors shrink-0"
                     title="Remove item"
@@ -158,15 +158,15 @@ export function CartClient() {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                
+
                 {/* Price & Quantity Stepper */}
                 <div className="flex justify-between items-center mt-2 pt-1">
                   <span className="font-black text-culinary-primary font-cormorant text-lg">
                     ₹{(Number(item.price) * item.quantity).toFixed(2)}
                   </span>
-                  
+
                   <div className="flex items-center bg-gray-900 text-white rounded-xl h-7 overflow-hidden shadow-2xs">
-                    <button 
+                    <button
                       type="button"
                       onClick={() => updateQuantity(item.id, item.quantity - 1)}
                       className="w-7 h-full flex items-center justify-center hover:bg-gray-800 active:bg-gray-700 transition-colors"
@@ -175,7 +175,7 @@ export function CartClient() {
                       <Minus size={12} />
                     </button>
                     <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
-                    <button 
+                    <button
                       type="button"
                       onClick={() => updateQuantity(item.id, item.quantity + 1)}
                       className="w-7 h-full flex items-center justify-center hover:bg-gray-800 active:bg-gray-700 transition-colors"
@@ -194,7 +194,7 @@ export function CartClient() {
         <section className="relative bg-[#FFFDF8] p-6 sm:p-7 rounded-3xl shadow-sm border border-[#E8DFC8] overflow-hidden">
           {/* Top highlight bar */}
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 via-culinary-primary to-amber-600"></div>
-          
+
           <div className="text-center mb-5 pt-1">
             <div className="flex items-center justify-center gap-1.5 text-amber-800 text-xs font-bold tracking-widest uppercase mb-1">
               <Receipt size={14} />
@@ -217,7 +217,7 @@ export function CartClient() {
               <span className="w-2/12 text-center">Qty</span>
               <span className="w-3/12 text-right">Amount</span>
             </div>
-            
+
             {items.map((item) => (
               <div key={item.id} className="flex justify-between text-stone-800 items-start">
                 <span className="w-7/12 pr-2 leading-tight truncate">{item.name}</span>
@@ -269,7 +269,7 @@ export function CartClient() {
               ₹{total.toFixed(2)}
             </span>
           </div>
-          <Link 
+          <Link
             href="/checkout"
             className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 to-culinary-primary hover:from-amber-700 hover:to-culinary-primary/90 text-center text-white rounded-2xl font-bold text-sm shadow-md shadow-amber-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >

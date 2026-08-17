@@ -3,14 +3,12 @@
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { 
-  ShoppingBag, 
-  Save, 
-  CheckCircle2, 
-  Zap, 
-  FileText, 
-  ShieldAlert, 
-  IndianRupee, 
+import {
+  ShoppingBag,
+  Save,
+  Zap,
+  FileText,
+  ShieldAlert,
   Sparkles,
   Utensils
 } from "lucide-react";
@@ -51,8 +49,12 @@ export default function OrderSettings({ data, refresh }: OrderSettingsProps) {
       });
       toast.success("Order handling rules saved successfully!");
       refresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update order settings");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to update order settings");
+      } else {
+        toast.error("Failed to update order settings");
+      }
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ export default function OrderSettings({ data, refresh }: OrderSettingsProps) {
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -79,10 +81,10 @@ export default function OrderSettings({ data, refresh }: OrderSettingsProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Left 2 Cols: Switches & Inputs */}
         <div className="lg:col-span-2 space-y-4 text-xs">
-          
+
           {/* Rule 1: Accept Online Orders */}
           <div className="flex items-center justify-between p-4 bg-gray-50/80 rounded-2xl border border-gray-200/80 hover:bg-gray-50 transition-colors">
             <div className="flex items-start gap-3">

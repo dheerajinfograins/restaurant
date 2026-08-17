@@ -136,7 +136,7 @@ export default function WaiterTablesPage() {
       } else {
         toast.error("Failed to serve order");
       }
-    } catch (e) {
+    } catch {
       toast.error("Error serving order");
     } finally {
       setServingOrderId(null);
@@ -263,7 +263,7 @@ export default function WaiterTablesPage() {
           <p className="text-2xl font-bold text-purple-700 mt-0.5">{kpis.dining}</p>
         </button>
 
-        <button
+        <button type="button"
           onClick={() => setSelectedFilter("AVAILABLE")}
           className={`p-4 rounded-2xl border text-left transition-all ${selectedFilter === "AVAILABLE"
             ? "bg-gray-100 border-gray-400 shadow-sm"
@@ -287,7 +287,7 @@ export default function WaiterTablesPage() {
             className="w-full pl-9 pr-9 py-2 text-xs rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 focus:border-culinary-primary transition-all text-gray-800 placeholder:text-gray-400"
           />
           {searchQuery && (
-            <button
+            <button type="button"
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center"
             >
@@ -313,36 +313,64 @@ export default function WaiterTablesPage() {
             const isServed = table.dynamicStatus === "SERVED";
             const isVacant = table.dynamicStatus === "AVAILABLE";
 
+            let cardBorder = "border-gray-200/80 hover:border-gray-300";
+            let headerBg = "bg-gray-50/60 border-gray-100";
+            let tableBadge = "bg-gray-200 text-gray-700";
+
+            if (isReady) {
+              cardBorder = "border-emerald-500 shadow-emerald-100 shadow-md ring-2 ring-emerald-400/30";
+              headerBg = "bg-emerald-50/80 border-emerald-100";
+              tableBadge = "bg-emerald-600 text-white";
+            } else if (isCooking) {
+              cardBorder = "border-amber-300 hover:border-amber-400";
+              headerBg = "bg-amber-50/60 border-amber-100";
+              tableBadge = "bg-amber-500 text-white";
+            } else if (isServed) {
+              cardBorder = "border-purple-200 hover:border-purple-300";
+              headerBg = "bg-purple-50/60 border-purple-100";
+              tableBadge = "bg-purple-600 text-white";
+            }
+
+            let actionFooterContent = (
+              <span className="w-full text-center text-[11px] font-semibold text-gray-400 py-1">
+                Available for Walk-in
+              </span>
+            );
+
+            if (isReady && table.activeOrder) {
+              actionFooterContent = (
+                <Button
+                  size="sm"
+                  onClick={() => handleServeOrder(table.activeOrder!.id)}
+                  disabled={servingOrderId === table.activeOrder.id}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 rounded-xl"
+                >
+                  <CheckCircle2 size={13} className="mr-1" />
+                  {servingOrderId === table.activeOrder.id ? "Serving..." : "Serve Food"}
+                </Button>
+              );
+            } else if (table.activeOrder) {
+              actionFooterContent = (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedTable(table)}
+                  className="w-full text-xs h-8 rounded-xl border-gray-200 text-gray-700 hover:bg-white"
+                >
+                  <Eye size={13} className="mr-1" /> View Ticket
+                </Button>
+              );
+            }
+
             return (
               <div
                 key={table.id}
-                className={`bg-white rounded-2xl shadow-sm transition-all flex flex-col justify-between overflow-hidden border-2 ${isReady
-                  ? "border-emerald-500 shadow-emerald-100 shadow-md ring-2 ring-emerald-400/30"
-                  : isCooking
-                    ? "border-amber-300 hover:border-amber-400"
-                    : isServed
-                      ? "border-purple-200 hover:border-purple-300"
-                      : "border-gray-200/80 hover:border-gray-300"
-                  }`}
+                className={`bg-white rounded-2xl shadow-sm transition-all flex flex-col justify-between overflow-hidden border-2 ${cardBorder}`}
               >
                 {/* Top Card Header */}
-                <div className={`p-4 border-b flex justify-between items-start ${isReady
-                  ? "bg-emerald-50/80 border-emerald-100"
-                  : isCooking
-                    ? "bg-amber-50/60 border-amber-100"
-                    : isServed
-                      ? "bg-purple-50/60 border-purple-100"
-                      : "bg-gray-50/60 border-gray-100"
-                  }`}>
+                <div className={`p-4 border-b flex justify-between items-start ${headerBg}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-cormorant font-bold text-xl shadow-sm ${isReady
-                      ? "bg-emerald-600 text-white"
-                      : isCooking
-                        ? "bg-amber-500 text-white"
-                        : isServed
-                          ? "bg-purple-600 text-white"
-                          : "bg-gray-200 text-gray-700"
-                      }`}>
+                    <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-cormorant font-bold text-xl shadow-sm ${tableBadge}`}>
                       T{table.tableNumber}
                     </div>
 
@@ -360,8 +388,8 @@ export default function WaiterTablesPage() {
                   <div>
                     {isReady && (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Food Ready
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Food Ready
+
                       </span>
                     )}
                     {isCooking && (
@@ -411,30 +439,7 @@ export default function WaiterTablesPage() {
 
                 {/* Card Action Footer */}
                 <div className="p-3 border-t border-gray-100 bg-gray-50/50 flex gap-2">
-                  {isReady && table.activeOrder ? (
-                    <Button
-                      size="sm"
-                      onClick={() => handleServeOrder(table.activeOrder!.id)}
-                      disabled={servingOrderId === table.activeOrder.id}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 rounded-xl"
-                    >
-                      <CheckCircle2 size={13} className="mr-1" />
-                      {servingOrderId === table.activeOrder.id ? "Serving..." : "Serve Food"}
-                    </Button>
-                  ) : table.activeOrder ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedTable(table)}
-                      className="w-full text-xs h-8 rounded-xl border-gray-200 text-gray-700 hover:bg-white"
-                    >
-                      <Eye size={13} className="mr-1" /> View Ticket
-                    </Button>
-                  ) : (
-                    <span className="w-full text-center text-[11px] font-semibold text-gray-400 py-1">
-                      Available for Walk-in
-                    </span>
-                  )}
+                  {actionFooterContent}
                 </div>
               </div>
             );

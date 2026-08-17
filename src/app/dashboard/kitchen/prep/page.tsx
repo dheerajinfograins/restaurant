@@ -1,5 +1,5 @@
 import { getAllProductsAction } from "@/modules/kitchen/controller";
-import { PrepGuideClient } from "@/components/kitchen/prep-guide-client";
+import { PrepGuideClient, Product } from "@/components/kitchen/prep-guide-client";
 
 export const metadata = {
   title: "Prep Guide | Kitchen",
@@ -7,7 +7,7 @@ export const metadata = {
 
 export default async function PrepGuidePage() {
   const result = await getAllProductsAction();
-  const products = result.success ? result.data : [];
+  const products = (result.success && result.data ? result.data : []) as Product[];
 
   return (
     <div className="flex-1 space-y-4 p-8 pt-6">
@@ -16,7 +16,7 @@ export default async function PrepGuidePage() {
         <p className="text-culinary-muted text-sm">Reference instructions and prep times for menu items</p>
       </div>
       
-      <PrepGuideClient products={products as any} />
+      <PrepGuideClient products={products} />
     </div>
   );
 }

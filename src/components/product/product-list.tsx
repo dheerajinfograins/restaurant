@@ -207,11 +207,11 @@ export function ProductList() {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (safeCurrentPage > 3) pages.push("...");
+      if (safeCurrentPage > 3) pages.push("dots-left");
       const start = Math.max(2, safeCurrentPage - 1);
       const end = Math.min(totalPages - 1, safeCurrentPage + 1);
       for (let i = start; i <= end; i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push("...");
+      if (safeCurrentPage < totalPages - 2) pages.push("dots-right");
       pages.push(totalPages);
     }
     return pages;
@@ -646,10 +646,10 @@ export function ProductList() {
               </Button>
 
               <div className="flex items-center gap-1 mx-1">
-                {getPageNumbers().map((p, idx) => {
-                  if (p === "...") {
+                {getPageNumbers().map((p) => {
+                  if (typeof p === "string" && p.startsWith("dots")) {
                     return (
-                      <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400">
+                      <span key={p} className="px-2 text-xs text-gray-400">
                         ...
                       </span>
                     );

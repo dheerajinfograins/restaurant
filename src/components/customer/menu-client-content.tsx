@@ -209,7 +209,7 @@ export function MenuClientContent({
                             <Minus size={14} />
                           </button>
                           <span className="w-6 text-center text-xs font-bold">{quantity}</span>
-                          <button
+                          <button type="button"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdateQuantity(product.id, quantity + 1); }}
                             className="w-8 h-full flex items-center justify-center font-bold hover:bg-gray-800 transition-colors"
                           >
@@ -217,7 +217,7 @@ export function MenuClientContent({
                           </button>
                         </div>
                       ) : (
-                        <button
+                        <button type="button"
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAdd(product); }}
                           className="px-5 py-2 h-8 flex items-center justify-center bg-black text-white text-xs font-semibold rounded-xl shadow-md active:scale-95 transition-transform hover:bg-gray-800"
                         >

@@ -1,22 +1,18 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { 
-  Search, 
-  CheckCircle2, 
-  History as HistoryIcon, 
-  Clock, 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight, 
+import {
+  Search,
+  CheckCircle2,
+  History as HistoryIcon,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Filter,
   RotateCw,
-  UtensilsCrossed,
-  ChefHat,
-  BellRing,
   User,
-  ShoppingBag
 } from "lucide-react";
 import type { OrderStatus } from "@prisma/client";
 import { format } from "date-fns";
@@ -45,6 +41,8 @@ export interface HistoryOrder {
   }>;
 }
 
+export type TimeRange = "today" | "week" | "all";
+
 const STATUS_FILTERS = [
   { label: "All Status", value: "ALL" },
   { label: "Preparing", value: "PREPARING" },
@@ -53,9 +51,9 @@ const STATUS_FILTERS = [
   { label: "Paid", value: "PAID" },
 ] as const;
 
-export function HistoryClient({ history: initialHistory }: { history: HistoryOrder[] }) {
+export function HistoryClient({ history: initialHistory }: Readonly<{ history: HistoryOrder[] }>) {
   const [history, setHistory] = useState<HistoryOrder[]>(initialHistory || []);
-  const [timeRange, setTimeRange] = useState<"today" | "week" | "all">("all");
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,7 +61,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch orders based on selected time range and status
-  const fetchHistory = async (range: "today" | "week" | "all", status = statusFilter) => {
+  const fetchHistory = async (range: TimeRange, status = statusFilter) => {
     setIsLoading(true);
     try {
       // 1. Try REST API first
@@ -73,7 +71,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
         setHistory(data);
         return;
       }
-      
+
       // 2. Fallback to Server Action
       const actionRes = await getKitchenHistoryAction(range);
       if (actionRes.success && actionRes.data) {
@@ -86,14 +84,44 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
     }
   };
 
-  // Initial load if initialHistory is empty
+  // Initial load if initialHistory is not provided
   useEffect(() => {
-    if (!initialHistory || initialHistory.length === 0) {
-      void fetchHistory("all");
+    if (initialHistory && initialHistory.length > 0) {
+      return;
     }
-  }, []);
 
-  const handleTimeRangeChange = async (newRange: "today" | "week" | "all") => {
+    let ignore = false;
+
+    async function loadInitialHistory() {
+      try {
+        const res = await fetch(`/api/kitchen/history?timeRange=all&status=ALL`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) {
+            setHistory(data);
+          }
+          return;
+        }
+
+        const actionRes = await getKitchenHistoryAction("all");
+        if (actionRes.success && actionRes.data && !ignore) {
+          setHistory(actionRes.data as unknown as HistoryOrder[]);
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error("Failed to load history:", err);
+        }
+      }
+    }
+
+    void loadInitialHistory();
+
+    return () => {
+      ignore = true;
+    };
+  }, [initialHistory]);
+
+  const handleTimeRangeChange = async (newRange: TimeRange) => {
     setTimeRange(newRange);
     setCurrentPage(1);
     await fetchHistory(newRange, statusFilter);
@@ -103,6 +131,16 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
     setStatusFilter(newStatus);
     setCurrentPage(1);
     await fetchHistory(timeRange, newStatus);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
   };
 
   // Filter orders by search term
@@ -126,11 +164,6 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
         o.items?.some((item) => item.product?.name?.toLowerCase().includes(q))
     );
   }, [history, statusFilter, search]);
-
-  // Reset to page 1 when search or pageSize changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, pageSize]);
 
   // Pagination calculation
   const totalItems = filteredHistory.length;
@@ -214,12 +247,12 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
             type="text"
             placeholder="Search order #, table, item, customer..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-10 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 bg-gray-50/60 focus:bg-white transition-all text-gray-800"
           />
           {search && (
-            <button
-              onClick={() => setSearch("")}
+            <button type="button"
+              onClick={() => handleSearchChange("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center"
             >
               ✕
@@ -234,33 +267,30 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
             <button
               type="button"
               onClick={() => handleTimeRangeChange("today")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                timeRange === "today"
-                  ? "bg-white text-culinary-primary shadow-sm font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${timeRange === "today"
+                ? "bg-white text-culinary-primary shadow-sm font-bold"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => handleTimeRangeChange("week")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                timeRange === "week"
-                  ? "bg-white text-culinary-primary shadow-sm font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${timeRange === "week"
+                ? "bg-white text-culinary-primary shadow-sm font-bold"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Last 7 Days
             </button>
             <button
               type="button"
               onClick={() => handleTimeRangeChange("all")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                timeRange === "all"
-                  ? "bg-white text-culinary-primary shadow-sm font-bold"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${timeRange === "all"
+                ? "bg-white text-culinary-primary shadow-sm font-bold"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               All History
             </button>
@@ -293,14 +323,13 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
         {STATUS_FILTERS.map((s) => {
           const isSelected = statusFilter === s.value;
           return (
-            <button
+            <button type="button"
               key={s.value}
               onClick={() => handleStatusFilterChange(s.value)}
-              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap ${
-                isSelected
-                  ? "bg-culinary-primary text-white shadow-sm font-bold"
-                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/80"
-              }`}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap ${isSelected
+                ? "bg-culinary-primary text-white shadow-sm font-bold"
+                : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/80"
+                }`}
             >
               {s.label}
             </button>
@@ -328,6 +357,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
                   setSearch("");
                   setStatusFilter("ALL");
                   setTimeRange("all");
+                  setCurrentPage(1);
                   void fetchHistory("all", "ALL");
                 }}
               >
@@ -432,7 +462,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
               <span className="font-medium">Cards per page:</span>
               <select
                 value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                 className="bg-white border border-gray-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
               >
                 <option value={6}>6</option>
@@ -488,14 +518,13 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
                 const pageNum = Number(p);
                 const isCurrent = pageNum === safeCurrentPage;
                 return (
-                  <button
+                  <button type="button"
                     key={`p-${pageNum}`}
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${
-                      isCurrent
-                        ? "bg-culinary-primary text-white shadow-sm"
-                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
+                    className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
+                      ? "bg-culinary-primary text-white shadow-sm"
+                      : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                      }`}
                   >
                     {pageNum}
                   </button>

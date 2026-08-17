@@ -6,14 +6,14 @@ import { requireRoles } from "@/lib/permissions";
 export async function GET() {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER", "KITCHEN", "WAITER", "CASHIER"]);
-    let restaurantId = payload.restaurantId;
+    let restaurantId: string | undefined = payload.restaurantId || undefined;
 
     if (!restaurantId && payload.id) {
       const user = await prisma.user.findUnique({
         where: { id: payload.id },
         select: { restaurantId: true }
       });
-      restaurantId = user?.restaurantId;
+      restaurantId = user?.restaurantId || undefined;
     }
 
     if (!restaurantId) {
@@ -21,7 +21,7 @@ export async function GET() {
         where: { isActive: true },
         select: { id: true }
       });
-      restaurantId = firstRest?.id;
+      restaurantId = firstRest?.id || undefined;
     }
 
     // 1. Restaurant Profile
@@ -63,10 +63,10 @@ export async function GET() {
       }),
     ]);
 
-    const revenue = lifetimeRevResult._sum.totalAmount
+    const revenue = lifetimeRevResult?._sum?.totalAmount
       ? Number(lifetimeRevResult._sum.totalAmount)
       : 0;
-    const todayRevenue = todayRevResult._sum.totalAmount
+    const todayRevenue = todayRevResult?._sum?.totalAmount
       ? Number(todayRevResult._sum.totalAmount)
       : 0;
 

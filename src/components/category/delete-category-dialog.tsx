@@ -29,7 +29,7 @@ export function DeleteCategoryDialog({
   onClose,
   category,
   onSuccess,
-}: DeleteCategoryDialogProps) {
+}: Readonly<DeleteCategoryDialogProps>) {
   const [isLoading, setIsLoading] = useState(false);
 
   async function onDelete() {
@@ -41,10 +41,14 @@ export function DeleteCategoryDialog({
       toast.success("Category deleted successfully");
       onSuccess();
       onClose();
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message || "An error occurred. Please try again."
-      );
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        toast.error(
+          error.response?.data?.message || "An error occurred. Please try again."
+        );
+      } else {
+        toast.error("An error occurred. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -57,7 +61,7 @@ export function DeleteCategoryDialog({
           <AlertDialogTitle className="font-cormorant text-2xl">Delete Category?</AlertDialogTitle>
           <AlertDialogDescription className="space-y-2">
             <p>
-              Are you sure? This action cannot be undone. This will permanently delete the category
+              Are you sure? This action cannot be undone. This will permanently delete the category{' '}
               <strong className="text-culinary-text ml-1">{category?.name}</strong>.
             </p>
             <div className="bg-red-50 text-red-800 p-3 rounded-md border border-red-100 flex items-center justify-between font-medium mt-2">

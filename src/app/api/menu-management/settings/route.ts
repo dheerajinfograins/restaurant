@@ -3,10 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function PATCH(request: NextRequest) {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    
+    if (!payload.restaurantId) {
+      throw new AppError("No restaurant associated with this user", HTTP_STATUS.BAD_REQUEST);
+    }
+
     const body = await request.json();
     
     // Whitelist
@@ -34,9 +40,13 @@ export async function PATCH(request: NextRequest) {
     if (showFeaturedItems !== undefined) dataToUpdate.showFeaturedItems = showFeaturedItems;
     if (allowOrdering !== undefined) dataToUpdate.allowOrdering = allowOrdering;
 
-    const updatedSettings = await prisma.restaurantSettings.update({
+    const updatedSettings = await prisma.restaurantSettings.upsert({
       where: { restaurantId: payload.restaurantId },
-      data: dataToUpdate
+      update: dataToUpdate,
+      create: {
+        restaurantId: payload.restaurantId,
+        ...dataToUpdate,
+      },
     });
 
     return successResponse("Menu settings updated", updatedSettings);

@@ -3,17 +3,14 @@
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { 
-  Receipt, 
-  Percent, 
-  FileText, 
-  IndianRupee, 
-  Sparkles, 
-  Save, 
-  RotateCcw,
-  CheckCircle2,
+import {
+  Receipt,
+  Percent,
+  FileText,
+  IndianRupee,
+  Sparkles,
+  Save,
   Building,
-  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +69,7 @@ export default function TaxBillingSettings({ data, refresh }: TaxBillingSettings
 
   return (
     <div className="space-y-6">
-      
+
       {/* Header */}
       <div className="flex items-center justify-between pb-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -91,10 +88,10 @@ export default function TaxBillingSettings({ data, refresh }: TaxBillingSettings
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Left 2 Cols: Form Inputs */}
         <div className="lg:col-span-2 space-y-5">
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
             {/* GST Number */}
             <div className="space-y-1.5">
@@ -226,8 +223,8 @@ export default function TaxBillingSettings({ data, refresh }: TaxBillingSettings
             </div>
 
             <div className="pt-2 text-[10px] text-gray-400 bg-white p-2.5 rounded-xl border border-gray-200/60 mt-3">
-              <span className="font-bold text-gray-600 block mb-0.5">GSTIN: {formData.gstNumber || "Not Configured"}</span>
-              This calculation rule will apply automatically across all table checkout bills and receipt prints.
+              <p className="font-bold text-gray-600 mb-0.5">GSTIN: {formData.gstNumber || "Not Configured"}</p>
+              <p>This calculation rule will apply automatically across all table checkout bills and receipt prints.</p>
             </div>
           </div>
         </div>

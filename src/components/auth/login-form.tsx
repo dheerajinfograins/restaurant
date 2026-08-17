@@ -52,8 +52,9 @@ export default function LoginForm() {
       if (result?.error) {
         toast.error(result.error);
       }
-    } catch (error: any) {
-      if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.includes("NEXT_REDIRECT")) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; digest?: string } | null;
+      if (err?.message?.includes("NEXT_REDIRECT") || err?.digest?.includes("NEXT_REDIRECT")) {
         return; // Normal Next.js navigation
       }
       console.error("Login error:", error);

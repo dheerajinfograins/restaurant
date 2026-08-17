@@ -3,18 +3,23 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 import { Prisma } from "@prisma/client";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
     
+    if (!payload.restaurantId) {
+      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
+    }
+
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: payload.restaurantId }
     });
 
     if (!restaurant) {
-      throw new Error("Restaurant not found");
+      throw new AppError("Restaurant not found", HTTP_STATUS.NOT_FOUND);
     }
 
     return successResponse("Restaurant profile fetched successfully", restaurant);
@@ -26,6 +31,11 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+
+    if (!payload.restaurantId) {
+      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
+    }
+
     const body = await request.json();
     
     const { 

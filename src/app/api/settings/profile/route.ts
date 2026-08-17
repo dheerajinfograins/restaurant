@@ -3,10 +3,16 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
+import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function PATCH(request: NextRequest) {
   try {
     const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    
+    if (!payload.restaurantId) {
+      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
+    }
+
     const body = await request.json();
     
     // Whitelist allowed fields to update on Restaurant

@@ -6,7 +6,7 @@ import { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 function serialize<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data));
+  return structuredClone(data);
 }
 
 async function resolveRestaurantId() {

@@ -11,9 +11,6 @@ import {
   Armchair,
   Receipt,
   LogOut,
-  Sparkles,
-  UtensilsCrossed,
-  Bell
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 
@@ -53,20 +50,20 @@ export default function WaiterSidebar({ restaurantName = "The Culinary Ledger" }
         <p className="px-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
           Floor Operations
         </p>
-        
+
         <div className="space-y-1">
           {sidebarLinks.map((link) => {
             const isActive = pathname === link.href;
             const Icon = link.icon;
-            
+
             return (
               <Link
                 key={link.title}
                 href={link.href}
                 className={cn(
                   "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200",
-                  isActive 
-                    ? "bg-culinary-primary text-white shadow-sm font-bold" 
+                  isActive
+                    ? "bg-culinary-primary text-white shadow-sm font-bold"
                     : "text-gray-600 hover:bg-gray-100/80 hover:text-gray-900"
                 )}
               >

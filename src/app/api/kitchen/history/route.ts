@@ -18,7 +18,7 @@ export async function GET(request: Request) {
         where: { id: payload.id },
         select: { restaurantId: true },
       });
-      restaurantId = user?.restaurantId;
+      restaurantId = user?.restaurantId ?? null;
     }
 
     if (!restaurantId) {

@@ -34,7 +34,7 @@ export async function PATCH(request: NextRequest) {
       if (!currentPassword) {
         throw new AppError("Current password is required to set a new password", HTTP_STATUS.BAD_REQUEST);
       }
-      
+
       const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
       if (!isPasswordValid) {
         throw new AppError("Incorrect current password", HTTP_STATUS.BAD_REQUEST);

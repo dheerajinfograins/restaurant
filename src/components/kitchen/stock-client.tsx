@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { toggleProductAvailabilityAction } from "@/modules/kitchen/controller";
 import toast from "react-hot-toast";
 import {
@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
-  Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -29,7 +28,7 @@ interface Product {
   };
 }
 
-export function StockClient({ initialProducts }: { initialProducts: Product[] }) {
+export function StockClient({ initialProducts }: Readonly<{ initialProducts: Product[] }>) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
@@ -59,6 +58,7 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
         toast.error("Failed to update stock status");
       }
     } catch (e) {
+      console.error("Error updating stock:", e);
       setProducts((prev) =>
         prev.map((p) => (p.id === productId ? { ...p, isAvailable: currentStatus } : p))
       );
@@ -102,9 +102,6 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
     });
   }, [products, search, selectedCategory, selectedStatus]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, selectedCategory, selectedStatus, pageSize]);
 
   const totalItems = filteredProducts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -124,11 +121,11 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (safeCurrentPage > 3) pages.push("...");
+      if (safeCurrentPage > 3) pages.push("dots-prev");
       const start = Math.max(2, safeCurrentPage - 1);
       const end = Math.min(totalPages - 1, safeCurrentPage + 1);
       for (let i = start; i <= end; i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push("...");
+      if (safeCurrentPage < totalPages - 2) pages.push("dots-next");
       pages.push(totalPages);
     }
     return pages;
@@ -140,9 +137,31 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
     return name.slice(0, 2).toUpperCase();
   };
 
+  const getFoodTypeBadge = (foodType?: string) => {
+    if (foodType === "NON_VEG") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+          🔴 Non-Veg
+        </span>
+      );
+    }
+    if (foodType === "EGG") {
+      return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+          🟡 Egg
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+        🟢 Pure Veg
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6 font-sans">
-      
+
       {/* Top 4 KPI Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm flex items-center justify-between">
@@ -200,7 +219,7 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
 
       {/* Main Table Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
-        
+
         {/* Filters Bar */}
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div className="relative w-full sm:w-80">
@@ -209,12 +228,18 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
               type="text"
               placeholder="Search items or categories..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full pl-9 pr-9 py-2 text-xs rounded-xl border border-gray-200 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 transition-all text-gray-800"
             />
             {search && (
-              <button
-                onClick={() => setSearch("")}
+              <button type="button"
+                onClick={() => {
+                  setSearch("");
+                  setCurrentPage(1);
+                }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center"
               >
                 ✕
@@ -226,7 +251,10 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
             {/* Category Filter */}
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setCurrentPage(1);
+              }}
               className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
             >
               <option value="ALL">All Categories ({categories.length})</option>
@@ -240,7 +268,10 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
             {/* Status Filter */}
             <select
               value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
               className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
             >
               <option value="ALL">All Status</option>
@@ -302,19 +333,7 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
                       </td>
 
                       <td className="px-6 py-3.5">
-                        {product.foodType === "NON_VEG" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            🔴 Non-Veg
-                          </span>
-                        ) : product.foodType === "EGG" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            🟡 Egg
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            🟢 Pure Veg
-                          </span>
-                        )}
+                        {getFoodTypeBadge(product.foodType)}
                       </td>
 
                       <td className="px-6 py-3.5 text-center">
@@ -325,9 +344,8 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
                             disabled={isUpdating === product.id}
                           />
                           <span
-                            className={`text-xs font-bold ${
-                              product.isAvailable ? "text-emerald-600" : "text-rose-600"
-                            }`}
+                            className={`text-xs font-bold ${product.isAvailable ? "text-emerald-600" : "text-rose-600"
+                              }`}
                           >
                             {product.isAvailable ? "In Stock" : "86'd"}
                           </span>
@@ -349,7 +367,10 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
                 <span className="font-medium">Per page:</span>
                 <select
                   value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
                   className="bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
                 >
                   <option value={10}>10</option>
@@ -390,27 +411,26 @@ export function StockClient({ initialProducts }: { initialProducts: Product[] })
               </Button>
 
               <div className="flex items-center gap-1 mx-1">
-                {getPageNumbers().map((p, idx) => {
-                  if (p === "...") {
+                {getPageNumbers().map((p) => {
+                  if (typeof p === "string") {
                     return (
-                      <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400">
+                      <span key={p} className="px-2 text-xs text-gray-400">
                         ...
                       </span>
                     );
                   }
-                  const pageNum = Number(p);
-                  const isCurrent = pageNum === safeCurrentPage;
+                  const isCurrent = p === safeCurrentPage;
                   return (
                     <button
-                      key={`page-${pageNum}`}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${
-                        isCurrent
-                          ? "bg-culinary-primary text-white shadow-sm"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                      }`}
+                      type="button"
+                      key={`page-${p}`}
+                      onClick={() => setCurrentPage(p)}
+                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
+                        ? "bg-culinary-primary text-white shadow-sm"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                        }`}
                     >
-                      {pageNum}
+                      {p}
                     </button>
                   );
                 })}

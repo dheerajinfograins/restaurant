@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useForm, Resolver } from "react-hook-form";
+import { useEffect } from "react";
+import { useForm, useWatch, Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, UtensilsCrossed, Users, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, Users, Sparkles, } from "lucide-react";
 import { RestaurantTable } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,8 @@ export default function TableFormModal({
     },
   });
 
+  const tableNumber = useWatch({ control: form.control, name: "tableNumber" });
+
   useEffect(() => {
     if (isOpen) {
       if (initialData) {
@@ -89,7 +91,7 @@ export default function TableFormModal({
           <SheetHeader className="border-b border-gray-100 pb-5 mb-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-50 text-culinary-primary font-bold text-xl flex items-center justify-center border border-amber-200/60 shadow-sm shrink-0 font-cormorant">
-                {form.watch("tableNumber") ? form.watch("tableNumber").slice(0, 2).toUpperCase() : "T"}
+                {tableNumber ? tableNumber.slice(0, 2).toUpperCase() : "T"}
               </div>
               <div>
                 <SheetTitle className="text-2xl font-bold font-cormorant text-gray-900">
@@ -106,7 +108,7 @@ export default function TableFormModal({
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-5 text-xs">
-              
+
               {/* Table Name / Number */}
               <FormField
                 control={form.control}

@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest) {
     if (recipeInstructions !== undefined) dataToUpdate.recipeInstructions = recipeInstructions;
 
     const updatedProduct = await prisma.product.update({
-      where: { id, restaurantId: payload.restaurantId },
+      where: { id, restaurantId: payload.restaurantId ?? undefined },
       data: dataToUpdate
     });
 

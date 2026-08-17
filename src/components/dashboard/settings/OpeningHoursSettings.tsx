@@ -3,22 +3,17 @@
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { 
-  Clock, 
-  Save, 
-  Calendar, 
-  CheckCircle2, 
-  Sparkles, 
-  Building,
-  RotateCw,
+import {
+  Clock,
+  Save,
+  Calendar,
+  Sparkles,
   Sun,
-  Moon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+
 
 const DAYS = [
   { key: "monday", label: "Monday" },
@@ -75,8 +70,12 @@ export default function OpeningHoursSettings({ data, refresh }: OpeningHoursSett
       await axios.patch("/api/settings/system", { openingHours, isRestaurantOpen: isOpen });
       toast.success("Opening hours and schedule saved successfully!");
       refresh();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update opening hours");
+    } catch (error: unknown) {
+      if (axios.isAxiosError(error)) {
+        toast.error(error.response?.data?.message || "Failed to update opening hours");
+      } else {
+        toast.error("Failed to update opening hours");
+      }
     } finally {
       setLoading(false);
     }
@@ -84,7 +83,7 @@ export default function OpeningHoursSettings({ data, refresh }: OpeningHoursSett
 
   return (
     <div className="space-y-6">
-      
+
       {/* Top Header & Master Switch */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
         <div className="flex items-center gap-3">
@@ -114,7 +113,7 @@ export default function OpeningHoursSettings({ data, refresh }: OpeningHoursSett
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* Left 2 Cols: Days Schedule Grid */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
