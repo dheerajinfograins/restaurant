@@ -209,7 +209,7 @@ export function CategoryFormModal({
                         
                         {imageUrl ? (
                           <div className="relative h-40 w-full border border-culinary-border rounded-xl overflow-hidden group">
-                            <Image src={imageUrl} alt="Category Preview" fill className="object-cover" />
+                            <Image src={imageUrl} alt="Category Preview" fill sizes="(max-width: 768px) 100vw, 500px" className="object-cover" />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                               <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
                                 Change Image

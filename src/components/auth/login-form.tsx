@@ -52,7 +52,10 @@ export default function LoginForm() {
       if (result?.error) {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes("NEXT_REDIRECT") || error?.digest?.includes("NEXT_REDIRECT")) {
+        return; // Normal Next.js navigation
+      }
       console.error("Login error:", error);
       toast.error("An unexpected error occurred. Please try again.");
     } finally {

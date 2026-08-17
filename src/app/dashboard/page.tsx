@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,26 +12,20 @@ import {
   Armchair,
   Users,
   Clock,
-  Sparkles,
+
   Utensils,
   ArrowRight,
   TrendingUp,
   RotateCw,
-  ExternalLink,
+
   ChefHat,
   QrCode,
   Store,
-  Layers,
-  CheckCircle2,
-  AlertCircle,
-  Image as ImageIcon,
   Check,
-  Building,
-  Phone
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+
 
 const AMBIANCE_PRESETS = [
   {
@@ -56,44 +50,124 @@ const AMBIANCE_PRESETS = [
   },
 ];
 
+interface RestaurantProfile {
+  id?: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  logo?: string | null;
+  coverImage?: string | null;
+  isActive: boolean;
+}
+
+interface DashboardMetrics {
+  revenue: number;
+  todayRevenue: number;
+  totalOrders: number;
+  todayOrders: number;
+  totalTables: number;
+  occupiedTables: number;
+  availableTables: number;
+  totalCustomers: number;
+}
+
+interface DashboardRecentOrder {
+  id: string;
+  tableNumber: string | number;
+  totalAmount: number;
+  status: string;
+  paymentMethod: string;
+  itemsCount: number;
+  itemsSummary: string;
+  createdAt: string | Date;
+}
+
+interface TopDish {
+  id: string;
+  name: string;
+  image?: string | null;
+  totalSold: number;
+  revenue: number;
+}
+
+interface DashboardData {
+  restaurant: RestaurantProfile;
+  metrics: DashboardMetrics;
+  recentOrders: DashboardRecentOrder[];
+  weeklyChartData: number[];
+  weeklyRevenue: number[];
+  dayLabels: string[];
+  topDishes: TopDish[];
+}
+
 export default function DashboardHome() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingCover, setIsUpdatingCover] = useState(false);
 
-  const fetchDashboard = useCallback(async (showIndicator = false) => {
-    if (showIndicator) setIsRefreshing(true);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
     try {
-      const res = await axios.get(`/api/dashboard?t=${new Date().getTime()}`);
+      const res = await axios.get(`/api/dashboard?t=${Date.now()}`);
       setData(res.data.data);
     } catch (e) {
       console.error("Dashboard fetch error:", e);
       toast.error("Failed to load dashboard data");
     } finally {
-      setLoading(false);
-      if (showIndicator) setIsRefreshing(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    void fetchDashboard();
-  }, [fetchDashboard]);
+    let ignore = false;
+
+    async function loadDashboard() {
+      try {
+        const res = await axios.get(`/api/dashboard?t=${Date.now()}`);
+        if (!ignore) {
+          setData(res.data.data);
+        }
+      } catch (e) {
+        if (!ignore) {
+          console.error("Dashboard fetch error:", e);
+          toast.error("Failed to load dashboard data");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadDashboard();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // Master Dining Open/Closed Switch
   const handleToggleDiningStatus = async (isActive: boolean) => {
     setIsUpdatingStatus(true);
     try {
       await axios.patch("/api/restaurant", { isActive });
-      setData((prev: any) => ({
-        ...prev,
-        restaurant: { ...prev?.restaurant, isActive },
-      }));
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              restaurant: { ...prev.restaurant, isActive },
+            }
+          : null
+      );
       toast.success(
         isActive ? "🟢 Restaurant opened for dining!" : "🔴 Restaurant marked as closed"
       );
     } catch (error) {
+      console.error("Failed to update restaurant status:", error);
       toast.error("Failed to update restaurant status");
     } finally {
       setIsUpdatingStatus(false);
@@ -105,12 +179,17 @@ export default function DashboardHome() {
     setIsUpdatingCover(true);
     try {
       await axios.patch("/api/restaurant", { coverImage });
-      setData((prev: any) => ({
-        ...prev,
-        restaurant: { ...prev?.restaurant, coverImage },
-      }));
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              restaurant: { ...prev.restaurant, coverImage },
+            }
+          : null
+      );
       toast.success("Ambiance cover updated!");
     } catch (error) {
+      console.error("Failed to update cover image:", error);
       toast.error("Failed to update cover image");
     } finally {
       setIsUpdatingCover(false);
@@ -176,10 +255,10 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-6 font-sans pb-16 animate-in fade-in duration-500">
-      
+
       {/* ===================== LUXURY HERO AMBIANCE COVER BANNER ===================== */}
       <div className="relative rounded-3xl overflow-hidden shadow-md border border-amber-900/10 min-h-[220px] md:min-h-[240px] flex flex-col justify-between p-6 md:p-8 bg-gray-900 text-white">
-        
+
         {/* Background Image with Dark Overlay */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -187,6 +266,7 @@ export default function DashboardHome() {
             alt="Restaurant Ambiance"
             fill
             priority
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 100vw, 1200px"
             className="object-cover object-center opacity-45 transform hover:scale-105 transition-transform duration-700"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
@@ -194,15 +274,14 @@ export default function DashboardHome() {
 
         {/* Top Row on Banner: Status & Quick Controls */}
         <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          
+
           {/* Status Badge & Open Toggle */}
           <div className="flex items-center gap-3">
             <span
-              className={`text-xs font-bold px-3 py-1 rounded-full backdrop-blur-md border shadow-sm flex items-center gap-1.5 ${
-                restaurant.isActive
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
-                  : "bg-rose-500/20 text-rose-300 border-rose-400/40"
-              }`}
+              className={`text-xs font-bold px-3 py-1 rounded-full backdrop-blur-md border shadow-sm flex items-center gap-1.5 ${restaurant.isActive
+                ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
+                : "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                }`}
             >
               <span className={`w-2 h-2 rounded-full ${restaurant.isActive ? "bg-emerald-400 animate-pulse" : "bg-rose-400"}`} />
               {restaurant.isActive ? "🟢 OPEN FOR DINING" : "🔴 CURRENTLY CLOSED"}
@@ -223,7 +302,7 @@ export default function DashboardHome() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => fetchDashboard(true)}
+              onClick={handleRefresh}
               disabled={isRefreshing}
               className="text-xs h-8 gap-1.5 bg-black/40 hover:bg-black/60 border-white/20 text-white rounded-xl backdrop-blur-md shadow-none"
             >
@@ -244,12 +323,18 @@ export default function DashboardHome() {
 
         {/* Bottom Row on Banner: Brand Identity & Ambiance Quick Selector */}
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-5 pt-6">
-          
+
           {/* Brand Info */}
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-gray-950 font-bold text-2xl flex items-center justify-center border-2 border-white/40 shadow-xl font-cormorant shrink-0">
+            <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-gray-950 font-bold text-2xl flex items-center justify-center border-2 border-white/40 shadow-xl font-cormorant shrink-0 relative overflow-hidden">
               {restaurant.logo ? (
-                <img src={restaurant.logo} alt="Logo" className="w-full h-full object-cover rounded-2xl" />
+                <Image
+                  src={restaurant.logo}
+                  alt={restaurant.name ? `${restaurant.name} Logo` : "Restaurant Logo"}
+                  fill
+                  sizes="(max-width: 768px) 56px, 64px"
+                  className="object-cover rounded-2xl"
+                />
               ) : (
                 restaurantMonogram
               )}
@@ -283,11 +368,10 @@ export default function DashboardHome() {
                   key={preset.id}
                   onClick={() => handleUpdateCover(preset.url)}
                   disabled={isUpdatingCover}
-                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 ${
-                    isSelected
-                      ? "bg-amber-500 text-black font-bold shadow-sm"
-                      : "text-gray-300 hover:text-white hover:bg-white/10"
-                  }`}
+                  className={`text-[11px] font-semibold px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 ${isSelected
+                    ? "bg-amber-500 text-black font-bold shadow-sm"
+                    : "text-gray-300 hover:text-white hover:bg-white/10"
+                    }`}
                 >
                   {isSelected && <Check size={11} className="stroke-[3]" />}
                   {preset.label}
@@ -300,7 +384,7 @@ export default function DashboardHome() {
 
       {/* ===================== TOP 4 EXECUTIVE KPI METRICS ===================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
+
         {/* Revenue */}
         <div className="bg-white p-5 rounded-2xl border border-gray-200/80 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
           <div className="space-y-1">
@@ -364,7 +448,7 @@ export default function DashboardHome() {
 
       {/* ===================== 2-COLUMN MAIN OPERATIONAL GRID ===================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
+
         {/* LEFT 2 COLS: RECENT LIVE ORDERS FEED */}
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
           <div>
@@ -397,7 +481,7 @@ export default function DashboardHome() {
                   No orders placed yet. Table QR orders will stream here live.
                 </div>
               ) : (
-                data?.recentOrders?.map((order: any) => (
+                data?.recentOrders?.map((order) => (
                   <div
                     key={order.id}
                     className="p-4 hover:bg-gray-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -448,7 +532,7 @@ export default function DashboardHome() {
 
         {/* RIGHT 1 COL: SALES OVERVIEW CHART & POPULAR DISHES */}
         <div className="space-y-6">
-          
+
           {/* Weekly Sales Pattern Bar Chart */}
           <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -465,11 +549,11 @@ export default function DashboardHome() {
 
             {/* Bars */}
             <div className="h-40 bg-gradient-to-b from-amber-50/40 to-transparent rounded-2xl border border-amber-100/60 p-4 flex items-end justify-between gap-2">
-              {(data?.weeklyChartData || [30, 50, 40, 70, 45, 90, 60]).map((height: number, idx: number) => {
-                const amount = data?.weeklyRevenue?.[idx] || 0;
-                const label = data?.dayLabels?.[idx] || `D${idx + 1}`;
+              {(data?.dayLabels || ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]).map((dayLabel, idx) => {
+                const height = data?.weeklyChartData?.[idx] ?? [30, 50, 40, 70, 45, 90, 60][idx] ?? 0;
+                const amount = data?.weeklyRevenue?.[idx] ?? 0;
                 return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
+                  <div key={dayLabel} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
                     <div className="w-full relative flex items-end justify-center h-28">
                       {/* Tooltip */}
                       <div className="absolute -top-7 bg-gray-900 text-white text-[10px] px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 shadow-md font-mono">
@@ -481,7 +565,7 @@ export default function DashboardHome() {
                         style={{ height: `${Math.max(height, 8)}%` }}
                       />
                     </div>
-                    <span className="text-[10px] font-bold text-gray-500 uppercase">{label}</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase">{dayLabel}</span>
                   </div>
                 );
               })}
@@ -505,7 +589,7 @@ export default function DashboardHome() {
                   Top selling dishes will appear once table orders are completed.
                 </p>
               ) : (
-                data?.topDishes?.map((dish: any, idx: number) => (
+                data?.topDishes?.map((dish, idx: number) => (
                   <div key={dish.id} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="w-5 h-5 rounded-full bg-amber-50 text-culinary-primary font-bold text-[10px] flex items-center justify-center shrink-0 border border-amber-200">

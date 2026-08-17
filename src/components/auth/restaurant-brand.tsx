@@ -9,6 +9,7 @@ export default function RestaurantBrand() {
           src="/images/restaurant-login.png" 
           alt="Restaurant background" 
           fill
+          sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-cover object-center"
           priority
         />
@@ -24,6 +25,7 @@ export default function RestaurantBrand() {
             src="/images/logo.png"
             alt="The Culinary Ledger Logo"
             fill
+            sizes="96px"
             className="object-contain p-2"
           />
         </div>

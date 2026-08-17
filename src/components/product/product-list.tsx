@@ -1,36 +1,27 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { 
-  Plus, 
-  Search, 
-  Edit3, 
-  Trash2, 
-  Image as ImageIcon, 
-  Box, 
+import {
+  Plus,
+  Search,
+  Edit3,
+  Trash2,
   RotateCw,
-  Utensils, 
-  Leaf, 
-  Flame, 
-  CheckCircle2, 
-  XCircle, 
-  Filter, 
-  ChevronsLeft, 
-  ChevronLeft, 
-  ChevronRight, 
+  Utensils,
+  Leaf,
+  Flame,
+  CheckCircle2,
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
   ChevronsRight,
   Star,
-  Layers,
-  Sparkles,
-  Tag
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -63,7 +54,7 @@ export function ProductList() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<IProduct | null>(null);
 
-  const fetchData = async (showIndicator = false) => {
+  const fetchData = useCallback(async (showIndicator = false) => {
     if (showIndicator) setIsRefreshing(true);
     try {
       const [productsRes, categoriesRes] = await Promise.all([
@@ -79,10 +70,38 @@ export function ProductList() {
       setIsLoading(false);
       if (showIndicator) setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    void fetchData();
+    let ignore = false;
+
+    const loadData = async () => {
+      try {
+        const [productsRes, categoriesRes] = await Promise.all([
+          axios.get("/api/products"),
+          axios.get("/api/categories"),
+        ]);
+        if (!ignore) {
+          setProducts(productsRes.data.data || []);
+          setCategories(categoriesRes.data.data || []);
+        }
+      } catch (error) {
+        if (!ignore) {
+          console.error("Failed to fetch data:", error);
+          toast.error("Failed to load products");
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadData();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleAdd = () => {
@@ -120,7 +139,8 @@ export function ProductList() {
         isFeatured: product.isFeatured,
       });
       toast.success(`${product.name} is now ${newStatus ? "In Stock" : "Out of Stock"}`);
-    } catch (error: any) {
+    } catch (error) {
+      console.error("Failed to update product stock status:", error);
       // Revert on error
       setProducts((prev) =>
         prev.map((p) => (p.id === product.id ? { ...p, isAvailable: !newStatus } : p))
@@ -153,12 +173,12 @@ export function ProductList() {
       const matchesSearch =
         !q ||
         prod.name.toLowerCase().includes(q) ||
-        (prod.description && prod.description.toLowerCase().includes(q)) ||
-        (prod.category?.name && prod.category.name.toLowerCase().includes(q));
+        prod.description?.toLowerCase().includes(q) ||
+        prod.category?.name?.toLowerCase().includes(q);
 
       const matchesCategory = selectedCategory === "ALL" || prod.categoryId === selectedCategory;
       const matchesFoodType = selectedFoodType === "ALL" || prod.foodType === selectedFoodType;
-      
+
       let matchesAvailability = true;
       if (selectedAvailability === "IN_STOCK") matchesAvailability = prod.isAvailable;
       else if (selectedAvailability === "OUT_OF_STOCK") matchesAvailability = !prod.isAvailable;
@@ -167,10 +187,6 @@ export function ProductList() {
     });
   }, [products, searchQuery, selectedCategory, selectedFoodType, selectedAvailability]);
 
-  // Reset page when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategory, selectedFoodType, selectedAvailability, pageSize]);
 
   // Pagination calculation
   const totalItems = filteredProducts.length;
@@ -237,7 +253,7 @@ export function ProductList() {
 
   return (
     <div className="space-y-6 font-sans pb-16">
-      
+
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Products */}
@@ -299,11 +315,11 @@ export function ProductList() {
 
       {/* Main Table Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-culinary-border/40 overflow-hidden">
-        
+
         {/* Top Controls Bar */}
         <div className="p-5 border-b border-gray-100 space-y-4">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            
+
             {/* Search Input */}
             <div className="relative w-full lg:w-96">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -311,12 +327,18 @@ export function ProductList() {
                 type="text"
                 placeholder="Search by dish name, ingredients, category..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="w-full pl-10 pr-9 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 focus:border-culinary-primary transition-all placeholder:text-gray-400 text-gray-800"
               />
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
+                <button type="button"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200/80 rounded-full w-4 h-4 flex items-center justify-center"
                 >
                   ✕
@@ -327,7 +349,13 @@ export function ProductList() {
             {/* Filter Dropdowns & Add Button */}
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto justify-between lg:justify-end">
               {/* Category Dropdown */}
-              <Select value={selectedCategory} onValueChange={(val) => setSelectedCategory(val ?? "ALL")}>
+              <Select
+                value={selectedCategory}
+                onValueChange={(val) => {
+                  setSelectedCategory(val ?? "ALL");
+                  setCurrentPage(1);
+                }}
+              >
                 <SelectTrigger className="rounded-xl border-gray-200 text-xs bg-white h-9 min-w-[140px]">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
@@ -345,7 +373,13 @@ export function ProductList() {
               </Select>
 
               {/* Food Type Dropdown */}
-              <Select value={selectedFoodType} onValueChange={(val) => setSelectedFoodType(val ?? "ALL")}>
+              <Select
+                value={selectedFoodType}
+                onValueChange={(val) => {
+                  setSelectedFoodType(val ?? "ALL");
+                  setCurrentPage(1);
+                }}
+              >
                 <SelectTrigger className="rounded-xl border-gray-200 text-xs bg-white h-9 min-w-[120px]">
                   <SelectValue placeholder="All Food Types" />
                 </SelectTrigger>
@@ -358,7 +392,13 @@ export function ProductList() {
               </Select>
 
               {/* Availability Dropdown */}
-              <Select value={selectedAvailability} onValueChange={(val) => setSelectedAvailability(val ?? "ALL")}>
+              <Select
+                value={selectedAvailability}
+                onValueChange={(val) => {
+                  setSelectedAvailability(val ?? "ALL");
+                  setCurrentPage(1);
+                }}
+              >
                 <SelectTrigger className="rounded-xl border-gray-200 text-xs bg-white h-9 min-w-[120px]">
                   <SelectValue placeholder="Stock Status" />
                 </SelectTrigger>
@@ -514,9 +554,8 @@ export function ProductList() {
                             onCheckedChange={() => handleToggleAvailability(product)}
                           />
                           <span
-                            className={`text-[11px] font-bold ${
-                              product.isAvailable ? "text-emerald-600" : "text-gray-400"
-                            }`}
+                            className={`text-[11px] font-bold ${product.isAvailable ? "text-emerald-600" : "text-gray-400"
+                              }`}
                           >
                             {product.isAvailable ? "In Stock" : "Out of Stock"}
                           </span>
@@ -562,7 +601,10 @@ export function ProductList() {
                 <span className="font-medium">Per page:</span>
                 <select
                   value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
                   className="bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
                 >
                   <option value={5}>5</option>
@@ -615,14 +657,13 @@ export function ProductList() {
                   const pageNum = Number(p);
                   const isCurrent = pageNum === safeCurrentPage;
                   return (
-                    <button
+                    <button type="button"
                       key={`page-${pageNum}`}
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${
-                        isCurrent
-                          ? "bg-culinary-primary text-white shadow-sm"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                      }`}
+                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
+                        ? "bg-culinary-primary text-white shadow-sm"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                        }`}
                     >
                       {pageNum}
                     </button>

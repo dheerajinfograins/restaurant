@@ -17,7 +17,13 @@ import { sidebarLinks } from "./sidebar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-export default function Navbar({ user = { name: "Admin", email: "admin@example.com", role: "SUPER_ADMIN" } }) {
+export default function Navbar({
+  user = { name: "Admin", email: "admin@example.com", role: "SUPER_ADMIN" },
+  restaurantName = "Culinary Ledger",
+}: {
+  user?: { name: string; email: string; role: string };
+  restaurantName?: string;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,10 +56,10 @@ export default function Navbar({ user = { name: "Admin", email: "admin@example.c
             <div className="h-20 flex items-center px-6 border-b border-culinary-border/50">
               <Link href="/dashboard" className="flex items-center gap-2" onClick={() => setIsMobileMenuOpen(false)}>
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-culinary-primary to-culinary-secondary flex items-center justify-center text-white font-cormorant font-bold text-lg shadow-sm">
-                  C
+                  {restaurantName.charAt(0).toUpperCase()}
                 </div>
                 <span className="font-cormorant font-semibold text-xl tracking-tight text-culinary-text truncate max-w-[150px]">
-                  Culinary Ledger
+                  {restaurantName}
                 </span>
               </Link>
             </div>

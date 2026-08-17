@@ -30,7 +30,7 @@ class TableService {
     // E.g. https://domain.com/menu/tableId
     // We'll pass the table.id in the URL
     // We assume the frontend will be served from the NEXT_PUBLIC_APP_URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://localhost:3000";
     const qrCodeUrl = `${appUrl}/menu/${table.id}`;
 
     return tableRepository.update(table.id, { qrCode: qrCodeUrl });

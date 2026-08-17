@@ -14,10 +14,11 @@ interface CartState {
   items: CartItem[];
   tableId: string | null;
   restaurantId: string | null;
+  restaurantName: string | null;
   activeOrderId: string | null;
   
   // Actions
-  setContext: (tableId: string, restaurantId: string) => void;
+  setContext: (tableId: string, restaurantId: string, restaurantName?: string) => void;
   setActiveOrderId: (orderId: string | null) => void;
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
@@ -35,13 +36,16 @@ export const useCartStore = create<CartState>()(
       items: [],
       tableId: null,
       restaurantId: null,
+      restaurantName: null,
       activeOrderId: null,
 
-      setContext: (tableId, restaurantId) => {
+      setContext: (tableId, restaurantId, restaurantName) => {
         const current = get();
         // If context changes (e.g. scanning a different QR), clear cart
         if (current.tableId !== tableId || current.restaurantId !== restaurantId) {
-          set({ tableId, restaurantId, items: [] });
+          set({ tableId, restaurantId, restaurantName: restaurantName || current.restaurantName, items: [] });
+        } else if (restaurantName && current.restaurantName !== restaurantName) {
+          set({ restaurantName });
         }
       },
 

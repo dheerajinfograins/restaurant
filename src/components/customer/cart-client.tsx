@@ -1,7 +1,7 @@
 "use client";
 
 import { useCartStore } from "@/store/cart-store";
-import { ArrowLeft, Minus, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, UtensilsCrossed, Sparkles, ChevronRight, Receipt, ShoppingBag } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 
 export function CartClient() {
   const [isMounted, setIsMounted] = useState(false);
-  const { items, tableId, removeItem, updateQuantity, getTotalPrice } = useCartStore();
+  const { items, tableId, restaurantName, removeItem, updateQuantity, getTotalPrice } = useCartStore();
   const router = useRouter();
 
   useEffect(() => {
@@ -21,161 +21,263 @@ export function CartClient() {
 
   if (items.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-          <span className="text-4xl">🛒</span>
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 text-center animate-in fade-in-50 duration-300">
+        <div className="w-24 h-24 bg-gradient-to-br from-amber-50 to-amber-100/80 rounded-3xl flex items-center justify-center mb-5 border border-amber-200 shadow-sm relative">
+          <ShoppingBag size={42} className="text-culinary-primary" />
+          <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-amber-400 text-stone-900 text-xs font-black flex items-center justify-center shadow-xs">
+            0
+          </div>
         </div>
-        <h2 className="text-2xl font-bold font-cormorant text-culinary-text mb-2">Your cart is empty</h2>
-        <p className="text-culinary-text/60 mb-8">Looks like you haven&apos;t added any delicious items yet.</p>
+        <h2 className="text-2xl sm:text-3xl font-bold font-cormorant text-culinary-text mb-2">
+          Your Cart is Empty
+        </h2>
+        <p className="text-xs sm:text-sm text-gray-500 max-w-xs mb-8 leading-relaxed">
+          Looks like you haven&apos;t added any delicious dishes yet. Explore our handcrafted menu!
+        </p>
         <Link 
-          href={tableId ? `/menu/${tableId}` : "#"}
-          className="px-8 py-3 bg-culinary-primary text-white rounded-xl font-semibold shadow-md"
+          href={tableId ? `/menu/${tableId}` : "/"}
+          className="px-8 py-3.5 bg-culinary-primary hover:bg-culinary-primary/90 text-white rounded-2xl font-bold text-sm shadow-md shadow-culinary-primary/25 active:scale-95 transition-all flex items-center gap-2"
         >
-          Browse Menu
+          <UtensilsCrossed size={16} />
+          <span>Explore Menu</span>
         </Link>
       </div>
     );
   }
 
   const subtotal = getTotalPrice();
-  const taxes = subtotal * 0.05; // 5% tax example
+  const taxes = subtotal * 0.05; // 5% GST
   const total = subtotal + taxes;
+  const totalItemCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  const renderFoodTypeBadge = (foodType?: string) => {
+    if (foodType === "VEG") {
+      return (
+        <div className="w-3.5 h-3.5 border border-emerald-600 flex items-center justify-center rounded-xs shrink-0 bg-white" title="Pure Veg">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-600"></div>
+        </div>
+      );
+    } else if (foodType === "NON_VEG") {
+      return (
+        <div className="w-3.5 h-3.5 border border-rose-600 flex items-center justify-center rounded-xs shrink-0 bg-white" title="Non-Veg">
+          <div className="w-1.5 h-1.5 rounded-full bg-rose-600"></div>
+        </div>
+      );
+    } else if (foodType === "EGG") {
+      return (
+        <div className="w-3.5 h-3.5 border border-amber-500 flex items-center justify-center rounded-xs shrink-0 bg-white" title="Contains Egg">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] pb-32">
-      {/* Header */}
-      <div className="flex items-center p-6 bg-white shadow-sm mb-6">
-        <button type="button" onClick={() => router.back()} className="mr-4">
-          <ArrowLeft size={24} className="text-culinary-text" />
-        </button>
-        <h1 className="text-2xl font-bold font-cormorant text-culinary-text">Your Cart</h1>
-      </div>
+    <div className="min-h-screen bg-[#FDFBF7] pb-36 animate-in fade-in-50 duration-300">
+      {/* Header Bar */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-2xs px-5 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button" 
+            onClick={() => router.back()} 
+            className="w-10 h-10 rounded-2xl bg-amber-50 hover:bg-amber-100 text-culinary-primary flex items-center justify-center border border-amber-200/70 transition-all active:scale-95 shadow-2xs"
+            aria-label="Go Back"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold font-cormorant text-culinary-text leading-tight">Your Cart</h1>
+            <p className="text-[11px] text-gray-500 font-medium">Review your items before ordering</p>
+          </div>
+        </div>
 
-      <div className="px-6 space-y-4">
-        {/* Cart Items */}
-        {items.map((item) => (
-          <div key={item.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex gap-4">
-            <div className="w-20 h-20 bg-gray-100 rounded-xl relative overflow-hidden flex-none">
-              {item.image ? (
-                <Image src={item.image} alt={item.name} fill className="object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300 text-xs">No Image</div>
-              )}
-            </div>
-            
-            <div className="flex-1 flex flex-col justify-between">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-culinary-text leading-tight">{item.name}</h3>
-                  <p className="text-xs text-culinary-text/60 mt-1">₹{item.price}</p>
-                </div>
-                <button 
-                  type="button"
-                  onClick={() => removeItem(item.id)}
-                  className="text-red-400 hover:text-red-500 p-1"
-                >
-                  <Trash2 size={16} />
-                </button>
+        <div className="bg-amber-100/70 border border-amber-200 px-3 py-1 rounded-full text-xs font-bold text-amber-900 flex items-center gap-1.5 shadow-2xs">
+          <span>{totalItemCount}</span>
+          <span>{totalItemCount === 1 ? "item" : "items"}</span>
+        </div>
+      </header>
+
+      <main className="px-5 pt-5 space-y-5">
+        {/* Cart Item Cards */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-400">Order Items</h2>
+            <Link 
+              href={tableId ? `/menu/${tableId}` : "/"}
+              className="text-xs font-bold text-culinary-primary hover:underline flex items-center gap-0.5"
+            >
+              <span>+ Add More</span>
+            </Link>
+          </div>
+
+          {items.map((item) => (
+            <div 
+              key={item.id} 
+              className="bg-white p-3.5 rounded-3xl shadow-xs border border-gray-100 hover:border-amber-200/80 transition-all flex gap-3.5 relative overflow-hidden group"
+            >
+              {/* Dish Image Thumbnail */}
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100/40 relative overflow-hidden shrink-0 border border-gray-100">
+                {item.image ? (
+                  <Image 
+                    src={item.image} 
+                    alt={item.name} 
+                    fill 
+                    sizes="80px"
+                    className="object-cover group-hover:scale-105 transition-transform duration-300" 
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-amber-700/40 gap-0.5">
+                    <UtensilsCrossed size={20} />
+                    <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">Dish</span>
+                  </div>
+                )}
               </div>
               
-              <div className="flex justify-between items-center mt-2">
-                <span className="font-bold text-culinary-primary">₹{item.price * item.quantity}</span>
+              {/* Item Info */}
+              <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
+                <div className="flex justify-between items-start gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {renderFoodTypeBadge(item.foodType)}
+                      <h3 className="font-bold text-culinary-text text-sm sm:text-base leading-tight truncate">
+                        {item.name}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-gray-400 font-medium">
+                      ₹{Number(item.price).toFixed(2)} each
+                    </span>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    onClick={() => removeItem(item.id)}
+                    className="w-7 h-7 rounded-xl text-gray-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors shrink-0"
+                    title="Remove item"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
                 
-                <div className="flex items-center bg-gray-100 rounded-lg">
-                  <button 
-                    type="button"
-                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                    className="w-8 h-8 flex items-center justify-center text-culinary-text font-bold"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="w-6 text-center text-sm font-bold">{item.quantity}</span>
-                  <button 
-                    type="button"
-                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                    className="w-8 h-8 flex items-center justify-center text-culinary-text font-bold"
-                  >
-                    <Plus size={14} />
-                  </button>
+                {/* Price & Quantity Stepper */}
+                <div className="flex justify-between items-center mt-2 pt-1">
+                  <span className="font-black text-culinary-primary font-cormorant text-lg">
+                    ₹{(Number(item.price) * item.quantity).toFixed(2)}
+                  </span>
+                  
+                  <div className="flex items-center bg-gray-900 text-white rounded-xl h-7 overflow-hidden shadow-2xs">
+                    <button 
+                      type="button"
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      className="w-7 h-full flex items-center justify-center hover:bg-gray-800 active:bg-gray-700 transition-colors"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span className="w-6 text-center text-xs font-bold">{item.quantity}</span>
+                    <button 
+                      type="button"
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      className="w-7 h-full flex items-center justify-center hover:bg-gray-800 active:bg-gray-700 transition-colors"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </section>
 
         {/* Premium Invoice Bill Summary */}
-        <div className="mt-10 relative bg-[#FFFDF8] p-8 rounded-lg shadow-[0_15px_40px_-10px_rgba(0,0,0,0.1)] border border-[#E8DFC8] mx-auto max-w-lg mb-8">
-          {/* Classic top border highlight */}
-          <div className="absolute top-0 left-0 w-full h-2 bg-culinary-primary/90 rounded-t-lg"></div>
+        <section className="relative bg-[#FFFDF8] p-6 sm:p-7 rounded-3xl shadow-sm border border-[#E8DFC8] overflow-hidden">
+          {/* Top highlight bar */}
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-500 via-culinary-primary to-amber-600"></div>
           
-          <div className="text-center mb-8 pt-2">
-            <h2 className="text-4xl font-bold font-cormorant text-culinary-text uppercase tracking-[0.2em]">Invoice</h2>
-            <p className="text-sm text-culinary-text/60 mt-2 font-medium tracking-widest uppercase">The Culinary Ledger</p>
-            <p className="text-xs text-culinary-text/40 mt-1">Date: {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          <div className="text-center mb-5 pt-1">
+            <div className="flex items-center justify-center gap-1.5 text-amber-800 text-xs font-bold tracking-widest uppercase mb-1">
+              <Receipt size={14} />
+              <span>Bill Summary</span>
+            </div>
+            <h2 className="text-2xl font-bold font-cormorant text-culinary-text tracking-wide">
+              {restaurantName || "The Culinary Ledger"}
+            </h2>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </p>
           </div>
 
-          <div className="border-b border-dashed border-[#D4C3A3] mb-6"></div>
+          <div className="border-b border-dashed border-[#D4C3A3]/80 my-4"></div>
 
-          {/* Itemized List inside Invoice */}
-          <div className="space-y-4 text-sm font-medium mb-6">
-            <div className="flex justify-between text-culinary-text/50 text-xs uppercase tracking-wider mb-2">
-              <span className="w-2/3">Item</span>
-              <span className="w-1/6 text-center">Qty</span>
-              <span className="w-1/6 text-right">Amount</span>
+          {/* Itemized List */}
+          <div className="space-y-2.5 text-xs font-medium">
+            <div className="flex justify-between text-gray-400 font-bold uppercase tracking-wider pb-1">
+              <span className="w-7/12">Item</span>
+              <span className="w-2/12 text-center">Qty</span>
+              <span className="w-3/12 text-right">Amount</span>
             </div>
             
             {items.map((item) => (
-              <div key={item.id} className="flex justify-between text-culinary-text/80 items-start">
-                <span className="w-2/3 pr-2 leading-tight">{item.name}</span>
-                <span className="w-1/6 text-center">x{item.quantity}</span>
-                <span className="w-1/6 text-right font-semibold">₹{(item.price * item.quantity).toFixed(2)}</span>
+              <div key={item.id} className="flex justify-between text-stone-800 items-start">
+                <span className="w-7/12 pr-2 leading-tight truncate">{item.name}</span>
+                <span className="w-2/12 text-center text-gray-500 font-semibold">x{item.quantity}</span>
+                <span className="w-3/12 text-right font-bold">₹{(item.price * item.quantity).toFixed(2)}</span>
               </div>
             ))}
           </div>
 
-          <div className="border-b border-dashed border-[#D4C3A3] mb-6"></div>
+          <div className="border-b border-dashed border-[#D4C3A3]/80 my-4"></div>
 
-          {/* Subtotals */}
-          <div className="space-y-3 text-sm font-medium mb-6">
-            <div className="flex justify-between text-culinary-text/70 items-center">
-              <span>Subtotal</span>
-              <span className="font-semibold">₹{subtotal.toFixed(2)}</span>
+          {/* Subtotals & Taxes */}
+          <div className="space-y-2 text-xs font-medium text-stone-700">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Subtotal</span>
+              <span className="font-semibold text-stone-900">₹{subtotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-culinary-text/70 items-center">
-              <span>Taxes (5% GST)</span>
-              <span className="font-semibold">₹{taxes.toFixed(2)}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Taxes (5% GST)</span>
+              <span className="font-semibold text-stone-900">₹{taxes.toFixed(2)}</span>
             </div>
           </div>
 
-          <div className="border-b-2 border-solid border-culinary-primary/20 mb-6"></div>
+          <div className="border-b-2 border-solid border-culinary-primary/20 my-4"></div>
 
           {/* Grand Total */}
-          <div className="flex justify-between items-center text-culinary-text bg-[#F9F3E5] p-5 rounded-xl shadow-inner border border-[#E8DFC8]/50">
-            <span className="text-2xl font-bold font-cormorant tracking-wide">Grand Total</span>
-            <span className="text-3xl font-bold text-culinary-primary">₹{total.toFixed(2)}</span>
+          <div className="flex justify-between items-center bg-[#F9F3E5] p-4 rounded-2xl border border-[#E8DFC8]/70 shadow-inner">
+            <div>
+              <span className="text-base font-bold font-cormorant text-stone-900 block leading-tight">Grand Total</span>
+              <span className="text-[10px] text-stone-500 font-medium">Inclusive of all taxes</span>
+            </div>
+            <span className="text-2xl font-black text-culinary-primary font-cormorant">
+              ₹{total.toFixed(2)}
+            </span>
           </div>
 
-          <div className="mt-8 text-center text-xs text-culinary-text/40 uppercase tracking-widest">
-            <p>Thank you for choosing us</p>
+          <div className="mt-5 text-center text-[10px] text-stone-400 font-bold uppercase tracking-widest">
+            <p>Freshly prepared upon your order</p>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
 
       {/* Fixed Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 w-full z-40 bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] pb-safe">
-        <div className="max-w-md mx-auto p-4 sm:p-6 flex items-center gap-4">
+      <footer className="fixed bottom-0 left-0 w-full z-40 bg-white/95 backdrop-blur-md border-t border-gray-100 shadow-[0_-10px_40px_rgba(0,0,0,0.06)] pb-safe">
+        <div className="max-w-md mx-auto p-4 flex items-center justify-between gap-4">
           <div className="flex flex-col">
-            <span className="text-xs text-culinary-text/70 font-medium">Amount to pay</span>
-            <span className="text-xl font-bold text-culinary-text">₹{total.toFixed(2)}</span>
+            <span className="text-[11px] text-gray-400 font-medium">To Pay</span>
+            <span className="text-xl font-black text-culinary-primary font-cormorant leading-tight">
+              ₹{total.toFixed(2)}
+            </span>
           </div>
           <Link 
             href="/checkout"
-            className="flex-1 py-4 bg-culinary-primary text-center text-white rounded-2xl font-bold text-lg shadow-lg shadow-culinary-primary/30"
+            className="flex-1 py-3.5 bg-gradient-to-r from-amber-600 to-culinary-primary hover:from-amber-700 hover:to-culinary-primary/90 text-center text-white rounded-2xl font-bold text-sm shadow-md shadow-amber-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
-            Checkout
+            <span>Proceed to Checkout</span>
+            <ChevronRight size={16} />
           </Link>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

@@ -5,6 +5,15 @@ class TableRepository {
   async findByRestaurantId(restaurantId: string): Promise<RestaurantTable[]> {
     return prisma.restaurantTable.findMany({
       where: { restaurantId },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -12,6 +21,15 @@ class TableRepository {
   async findById(id: string, restaurantId: string): Promise<RestaurantTable | null> {
     return prisma.restaurantTable.findUnique({
       where: { id, restaurantId },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+      },
     });
   }
 

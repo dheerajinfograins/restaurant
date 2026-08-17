@@ -5,8 +5,24 @@ import { requireRoles } from "@/lib/permissions";
 
 export async function GET() {
   try {
-    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-    const restaurantId = payload.restaurantId;
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER", "KITCHEN", "WAITER", "CASHIER"]);
+    let restaurantId = payload.restaurantId;
+
+    if (!restaurantId && payload.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.id },
+        select: { restaurantId: true }
+      });
+      restaurantId = user?.restaurantId;
+    }
+
+    if (!restaurantId) {
+      const firstRest = await prisma.restaurant.findFirst({
+        where: { isActive: true },
+        select: { id: true }
+      });
+      restaurantId = firstRest?.id;
+    }
 
     // 1. Restaurant Profile
     let restaurant = null;

@@ -12,18 +12,26 @@ import {
   ChevronsRight, 
   Filter,
   RotateCw,
-  UtensilsCrossed
+  UtensilsCrossed,
+  ChefHat,
+  BellRing,
+  User,
+  ShoppingBag
 } from "lucide-react";
 import type { OrderStatus } from "@prisma/client";
 import { format } from "date-fns";
 import { getKitchenHistoryAction } from "@/modules/kitchen/controller";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export interface HistoryOrder {
   id: string;
   orderNumber: string;
   customerName?: string;
+  customerPhone?: string;
   status: OrderStatus;
+  paymentMethod?: string | null;
+  totalAmount?: number;
   createdAt: string;
   updatedAt: string;
   notes?: string | null;
@@ -31,25 +39,45 @@ export interface HistoryOrder {
   items: Array<{
     id: string;
     quantity: number;
-    product: { name: string; price?: number };
+    unitPrice?: number;
+    totalPrice?: number;
+    product: { name: string; price?: number; foodType?: string };
   }>;
 }
 
+const STATUS_FILTERS = [
+  { label: "All Status", value: "ALL" },
+  { label: "Preparing", value: "PREPARING" },
+  { label: "Ready", value: "READY" },
+  { label: "Served", value: "SERVED" },
+  { label: "Paid", value: "PAID" },
+] as const;
+
 export function HistoryClient({ history: initialHistory }: { history: HistoryOrder[] }) {
   const [history, setHistory] = useState<HistoryOrder[]>(initialHistory || []);
-  const [timeRange, setTimeRange] = useState<"today" | "week" | "all">("today");
+  const [timeRange, setTimeRange] = useState<"today" | "week" | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10); // Minimum 10 cards default as requested
+  const [pageSize, setPageSize] = useState(9);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch orders based on selected time range
-  const fetchHistory = async (range: "today" | "week" | "all") => {
+  // Fetch orders based on selected time range and status
+  const fetchHistory = async (range: "today" | "week" | "all", status = statusFilter) => {
     setIsLoading(true);
     try {
-      const res = await getKitchenHistoryAction(range);
-      if (res.success && res.data) {
-        setHistory(res.data as unknown as HistoryOrder[]);
+      // 1. Try REST API first
+      const res = await fetch(`/api/kitchen/history?timeRange=${range}&status=${status}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHistory(data);
+        return;
+      }
+      
+      // 2. Fallback to Server Action
+      const actionRes = await getKitchenHistoryAction(range);
+      if (actionRes.success && actionRes.data) {
+        setHistory(actionRes.data as unknown as HistoryOrder[]);
       }
     } catch (err) {
       console.error("Failed to load history:", err);
@@ -58,17 +86,38 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
     }
   };
 
+  // Initial load if initialHistory is empty
+  useEffect(() => {
+    if (!initialHistory || initialHistory.length === 0) {
+      void fetchHistory("all");
+    }
+  }, []);
+
   const handleTimeRangeChange = async (newRange: "today" | "week" | "all") => {
     setTimeRange(newRange);
     setCurrentPage(1);
-    await fetchHistory(newRange);
+    await fetchHistory(newRange, statusFilter);
+  };
+
+  const handleStatusFilterChange = async (newStatus: string) => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+    await fetchHistory(timeRange, newStatus);
   };
 
   // Filter orders by search term
   const filteredHistory = useMemo(() => {
+    let result = history;
+
+    // Filter by status if not "ALL"
+    if (statusFilter !== "ALL") {
+      result = result.filter((o) => o.status === statusFilter);
+    }
+
     const q = search.toLowerCase().trim();
-    if (!q) return history;
-    return history.filter(
+    if (!q) return result;
+
+    return result.filter(
       (o) =>
         o.orderNumber?.toLowerCase().includes(q) ||
         o.table?.tableNumber?.toString().toLowerCase().includes(q) ||
@@ -76,7 +125,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
         o.notes?.toLowerCase().includes(q) ||
         o.items?.some((item) => item.product?.name?.toLowerCase().includes(q))
     );
-  }, [history, search]);
+  }, [history, statusFilter, search]);
 
   // Reset to page 1 when search or pageSize changes
   useEffect(() => {
@@ -113,24 +162,65 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
     return pages;
   };
 
+  const renderStatusBadge = (status: OrderStatus) => {
+    switch (status) {
+      case "PREPARING":
+        return (
+          <Badge className="bg-amber-100 text-amber-900 border-amber-300 shadow-none text-[10px] font-bold uppercase tracking-wider">
+            Preparing
+          </Badge>
+        );
+      case "READY":
+        return (
+          <Badge className="bg-emerald-100 text-emerald-900 border-emerald-300 shadow-none text-[10px] font-bold uppercase tracking-wider">
+            Ready
+          </Badge>
+        );
+      case "SERVED":
+        return (
+          <Badge className="bg-purple-100 text-purple-900 border-purple-300 shadow-none text-[10px] font-bold uppercase tracking-wider">
+            Served
+          </Badge>
+        );
+      case "PAID":
+        return (
+          <Badge className="bg-emerald-600 text-white border-emerald-700 shadow-none text-[10px] font-bold uppercase tracking-wider">
+            Paid
+          </Badge>
+        );
+      case "CANCELLED":
+        return (
+          <Badge className="bg-rose-100 text-rose-900 border-rose-300 shadow-none text-[10px] font-bold uppercase tracking-wider">
+            Cancelled
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider">
+            {status}
+          </Badge>
+        );
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-culinary-border/40 font-sans space-y-6">
       {/* Top Header Controls: Search, Time Filter Tabs, and Refresh */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         {/* Search Bar */}
         <div className="relative w-full lg:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-culinary-muted" size={18} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
           <input
             type="text"
-            placeholder="Search order #, table, item..."
+            placeholder="Search order #, table, item, customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-8 py-2.5 text-sm border border-culinary-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 transition-all bg-culinary-background/30"
+            className="w-full pl-10 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 bg-gray-50/60 focus:bg-white transition-all text-gray-800"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full w-4 h-4 flex items-center justify-center"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200 rounded-full w-4 h-4 flex items-center justify-center"
             >
               ✕
             </button>
@@ -140,13 +230,13 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
         {/* Time Filter Pills & Summary Counter */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
           {/* Time range buttons */}
-          <div className="flex items-center gap-1 bg-gray-100/80 p-1 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-1 bg-gray-100/90 p-1 rounded-xl border border-gray-200">
             <button
               type="button"
               onClick={() => handleTimeRangeChange("today")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 timeRange === "today"
-                  ? "bg-white text-culinary-primary shadow-sm"
+                  ? "bg-white text-culinary-primary shadow-sm font-bold"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -157,7 +247,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
               onClick={() => handleTimeRangeChange("week")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 timeRange === "week"
-                  ? "bg-white text-culinary-primary shadow-sm"
+                  ? "bg-white text-culinary-primary shadow-sm font-bold"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -168,7 +258,7 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
               onClick={() => handleTimeRangeChange("all")}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 timeRange === "all"
-                  ? "bg-white text-culinary-primary shadow-sm"
+                  ? "bg-white text-culinary-primary shadow-sm font-bold"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
@@ -179,41 +269,69 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchHistory(timeRange)}
+            onClick={() => fetchHistory(timeRange, statusFilter)}
             disabled={isLoading}
-            className="text-xs h-9 gap-1.5 border-gray-300 hover:bg-gray-50"
+            className="text-xs h-9 gap-1.5 border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl"
           >
             <RotateCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-culinary-primary" : ""}`} />
             Refresh
           </Button>
 
           {/* Badge Counter */}
-          <div className="bg-green-50 text-green-700 px-3.5 py-2 rounded-xl flex items-center gap-2 border border-green-100 text-xs font-bold shadow-sm">
-            <CheckCircle2 size={16} />
-            <span>{history.length} Orders Completed</span>
+          <div className="bg-emerald-50 text-emerald-700 px-3.5 py-2 rounded-xl flex items-center gap-2 border border-emerald-200 text-xs font-bold shadow-2xs">
+            <CheckCircle2 size={15} />
+            <span>{history.length} Orders in History</span>
           </div>
         </div>
       </div>
 
+      {/* Status Filter Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin pt-1">
+        <span className="text-xs font-semibold text-gray-400 flex items-center gap-1 mr-1 shrink-0 uppercase tracking-wider text-[11px]">
+          <Filter className="h-3 w-3" /> Status:
+        </span>
+        {STATUS_FILTERS.map((s) => {
+          const isSelected = statusFilter === s.value;
+          return (
+            <button
+              key={s.value}
+              onClick={() => handleStatusFilterChange(s.value)}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap ${
+                isSelected
+                  ? "bg-culinary-primary text-white shadow-sm font-bold"
+                  : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/80"
+              }`}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Cards Grid */}
       <div className="space-y-6">
-        {filteredHistory.length === 0 ? (
-          <div className="text-center py-20 text-culinary-muted bg-culinary-background/20 rounded-2xl border border-dashed border-culinary-border/50">
-            <HistoryIcon size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="font-cormorant text-2xl font-semibold text-gray-700">No completed orders found.</p>
-            <p className="text-xs text-gray-400 mt-1">
-              {search
-                ? "Try searching for a different order number or table."
-                : "Completed and served orders for this period will appear here."}
+        {paginatedOrders.length === 0 ? (
+          <div className="text-center py-16 text-gray-500 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+            <HistoryIcon size={44} className="mx-auto mb-3 text-gray-300" />
+            <p className="font-cormorant text-2xl font-bold text-gray-800">No orders found in history.</p>
+            <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+              {search || statusFilter !== "ALL"
+                ? "Try adjusting your search terms or selecting 'All Status' / 'All History'."
+                : "Completed and served kitchen orders will appear here automatically."}
             </p>
-            {search && (
+            {(search || statusFilter !== "ALL" || timeRange !== "all") && (
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-4 text-xs"
-                onClick={() => setSearch("")}
+                className="mt-4 text-xs rounded-xl"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("ALL");
+                  setTimeRange("all");
+                  void fetchHistory("all", "ALL");
+                }}
               >
-                Clear Search
+                Reset All Filters
               </Button>
             )}
           </div>
@@ -222,38 +340,59 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
             {paginatedOrders.map((order) => (
               <div
                 key={order.id}
-                className="bg-white border border-culinary-border/30 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                className="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
               >
                 <div>
                   {/* Top Card Header */}
-                  <div className="flex justify-between items-start mb-4 pb-3 border-b border-culinary-border/20">
+                  <div className="flex justify-between items-start mb-3.5 pb-3 border-b border-gray-100">
                     <div>
                       <h3 className="font-bold text-2xl font-cormorant text-culinary-text">
                         Table {order.table?.tableNumber || "N/A"}
                       </h3>
-                      <p className="text-xs text-culinary-muted font-medium uppercase tracking-wider mt-0.5">
+                      <p className="text-xs text-gray-400 font-mono uppercase tracking-wider mt-0.5">
                         {order.orderNumber}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-1">
                       <span className="inline-flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600">
-                        <Clock size={13} className="text-gray-400" />
-                        {format(new Date(order.updatedAt), "hh:mm a")}
+                        <Clock size={12} className="text-gray-400" />
+                        {format(new Date(order.createdAt), "hh:mm a")}
+                      </span>
+                      <span className="text-[10px] text-gray-400">
+                        {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </span>
                     </div>
                   </div>
 
+                  {/* Customer Info */}
+                  {order.customerName && (
+                    <div className="mb-3 flex items-center gap-1.5 text-xs text-gray-700 bg-gray-50/60 p-2 rounded-lg border border-gray-100">
+                      <User size={13} className="text-gray-400 shrink-0" />
+                      <span className="font-semibold text-gray-800">{order.customerName}</span>
+                      {order.customerPhone && (
+                        <span className="text-gray-400 text-[11px]">({order.customerPhone})</span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Items List */}
-                  <div className="space-y-2 mb-4">
+                  <div className="space-y-2 mb-3">
                     {order.items?.map((item) => (
                       <div
                         key={item.id}
-                        className="flex gap-2.5 text-sm text-gray-800 items-center bg-gray-50/60 p-2 rounded-lg border border-gray-100"
+                        className="flex justify-between text-sm text-gray-800 items-center bg-gray-50/70 p-2 rounded-lg border border-gray-100"
                       >
-                        <span className="font-bold text-white bg-culinary-primary w-6 h-6 rounded flex items-center justify-center text-xs shrink-0 shadow-sm">
-                          {item.quantity}
-                        </span>
-                        <span className="font-medium text-xs text-gray-700 truncate">{item.product?.name}</span>
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <span className="font-bold text-white bg-culinary-primary w-5 h-5 rounded flex items-center justify-center text-[10px] shrink-0 shadow-2xs">
+                            {item.quantity}
+                          </span>
+                          <span className="font-medium text-xs text-gray-800 truncate">{item.product?.name}</span>
+                        </div>
+                        {item.totalPrice && (
+                          <span className="text-[11px] font-semibold text-gray-500 shrink-0">
+                            ₹{Number(item.totalPrice).toFixed(2)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -268,21 +407,15 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
                 </div>
 
                 {/* Bottom Card Footer */}
-                <div className="pt-3 border-t border-culinary-border/20 flex justify-between items-center text-xs">
-                  <span className="text-gray-400 font-medium">
-                    Received: {format(new Date(order.createdAt), "hh:mm a")}
-                  </span>
-                  <span
-                    className={`font-bold px-2.5 py-1 rounded-full uppercase tracking-wider text-[10px] ${
-                      order.status === "READY"
-                        ? "bg-green-100 text-green-800 border border-green-200"
-                        : order.status === "PAID"
-                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                        : "bg-purple-100 text-purple-800 border border-purple-200"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
+                <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs">
+                  {order.totalAmount ? (
+                    <span className="font-bold text-sm text-gray-900 font-cormorant">
+                      ₹{Number(order.totalAmount).toFixed(2)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 text-[11px]">Kitchen Ticket</span>
+                  )}
+                  <div>{renderStatusBadge(order.status)}</div>
                 </div>
               </div>
             ))}
@@ -304,7 +437,6 @@ export function HistoryClient({ history: initialHistory }: { history: HistoryOrd
               >
                 <option value={6}>6</option>
                 <option value={9}>9</option>
-                <option value={10}>10</option>
                 <option value={12}>12</option>
                 <option value={18}>18</option>
                 <option value={24}>24</option>

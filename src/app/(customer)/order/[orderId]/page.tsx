@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { OrderTrackerClient } from "@/components/customer/order-tracker-client";
 
 export default async function OrderTrackingPage({
@@ -16,7 +15,8 @@ export default async function OrderTrackingPage({
       items: {
         include: { product: true }
       },
-      table: true
+      table: true,
+      restaurant: true,
     }
   });
 
@@ -28,34 +28,31 @@ export default async function OrderTrackingPage({
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
+    paymentMethod: order.paymentMethod,
+    notes: order.notes,
     createdAt: order.createdAt,
-    table: {
-      tableNumber: order.table.tableNumber,
-    },
+    tableId: order.tableId,
+    tableNumber: order.table.tableNumber,
+    restaurantName: order.restaurant.name,
+    restaurantLogo: order.restaurant.logo,
     items: order.items.map(item => ({
       id: item.id,
       quantity: item.quantity,
+      unitPrice: Number(item.unitPrice || 0),
       totalPrice: Number(item.totalPrice),
       product: {
+        id: item.product.id,
         name: item.product.name,
+        image: item.product.image,
+        foodType: item.product.foodType,
       }
     })),
     totalAmount: Number(order.totalAmount),
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFBF7] p-6 pb-32">
+    <div className="min-h-screen bg-[#FDFBF7] pb-28">
       <OrderTrackerClient initialOrder={formattedOrder} />
-
-      {/* New Order Button */}
-      <div className="mt-10 text-center">
-        <Link 
-          href={`/menu/${order.tableId}`}
-          className="inline-block px-8 py-3 bg-white border border-culinary-border/40 text-culinary-text rounded-2xl font-bold shadow-sm"
-        >
-          Order Something Else
-        </Link>
-      </div>
     </div>
   );
 }

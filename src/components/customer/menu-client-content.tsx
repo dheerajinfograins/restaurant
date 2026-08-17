@@ -90,7 +90,7 @@ export function MenuClientContent({
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-culinary-primary/10 rounded-full flex items-center justify-center overflow-hidden relative">
               {restaurant.logo ? (
-                <Image src={restaurant.logo} alt={restaurant.name} fill className="object-cover" />
+                <Image src={restaurant.logo} alt={restaurant.name} fill sizes="48px" className="object-cover" />
               ) : (
                 <UtensilsCrossed className="text-culinary-primary w-6 h-6" />
               )}
@@ -167,7 +167,7 @@ export function MenuClientContent({
                     <Link href={`/product/${product.id}?tableId=${tableId}`} className="flex gap-4 flex-1">
                       <div className="w-28 h-28 bg-gray-100 rounded-2xl flex-none overflow-hidden relative">
                         {product.image ? (
-                          <Image src={product.image} alt={product.name} fill className="object-cover" />
+                          <Image src={product.image} alt={product.name} fill sizes="112px" className="object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400">
                             <UtensilsCrossed size={24} />
@@ -202,7 +202,7 @@ export function MenuClientContent({
                     <div className="flex flex-col justify-end pb-1 pr-1 shrink-0">
                       {quantity > 0 ? (
                         <div className="flex items-center bg-black text-white rounded-xl h-8 overflow-hidden shadow-md">
-                          <button
+                          <button type="button"
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdateQuantity(product.id, quantity - 1); }}
                             className="w-8 h-full flex items-center justify-center font-bold hover:bg-gray-800 transition-colors"
                           >

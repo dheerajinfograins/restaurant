@@ -6,7 +6,7 @@ export const metadata = {
 };
 
 export default async function KitchenHistoryPage() {
-  const result = await getKitchenHistoryAction();
+  const result = await getKitchenHistoryAction("all");
   const history = result.success ? result.data : [];
 
   return (

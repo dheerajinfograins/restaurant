@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { io as ClientIO, Socket } from "socket.io-client";
 
 type SocketContextType = {
@@ -31,25 +31,32 @@ export const SocketProvider = ({
     const socketInstance = ClientIO(); // automatically connects to the host that serves the page
 
     socketInstance.on("connect", () => {
+      setSocket(socketInstance);
       setIsConnected(true);
-      if (restaurantId) {
-        socketInstance.emit("join_restaurant", restaurantId);
-      }
     });
 
     socketInstance.on("disconnect", () => {
       setIsConnected(false);
     });
 
-    setSocket(socketInstance);
-
     return () => {
       socketInstance.disconnect();
     };
-  }, [restaurantId]);
+  }, []);
+
+  useEffect(() => {
+    if (socket && isConnected && restaurantId) {
+      socket.emit("join_restaurant", restaurantId);
+    }
+  }, [socket, isConnected, restaurantId]);
+
+  const value = useMemo(
+    () => ({ socket, isConnected }),
+    [socket, isConnected]
+  );
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={value}>
       {children}
     </SocketContext.Provider>
   );

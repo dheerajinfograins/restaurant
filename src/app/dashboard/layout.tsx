@@ -34,7 +34,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <div className="flex h-screen bg-culinary-background overflow-hidden">
         <Sidebar role={role} restaurantName={restaurantName} />
         <div className="flex flex-col flex-1 overflow-hidden relative">
-          <Navbar user={user} />
+          <Navbar user={user} restaurantName={restaurantName} />
           <main className="flex-1 overflow-y-auto p-6 md:p-8">
             <div className="max-w-7xl mx-auto space-y-8">
               {children}

@@ -6,13 +6,23 @@ import { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
 function serialize<T>(data: T): T {
-  return structuredClone(data);
+  return JSON.parse(JSON.stringify(data));
 }
 
 async function resolveRestaurantId() {
   const payload = await getOptionalPayload();
   if (payload?.restaurantId) return payload.restaurantId;
-  const defaultRestaurant = await prisma.restaurant.findFirst();
+  if (payload?.id) {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.id },
+      select: { restaurantId: true },
+    });
+    if (user?.restaurantId) return user.restaurantId;
+  }
+  const defaultRestaurant = await prisma.restaurant.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  });
   return defaultRestaurant?.id || null;
 }
 
@@ -165,7 +175,7 @@ export async function toggleProductAvailabilityAction(productId: string, isAvail
   }
 }
 
-export async function getKitchenHistoryAction(timeRange: "today" | "week" | "all" = "today") {
+export async function getKitchenHistoryAction(timeRange: "today" | "week" | "all" = "all") {
   try {
     const restaurantId = await resolveRestaurantId();
     if (!restaurantId) return { success: true, data: [] };
@@ -185,10 +195,7 @@ export async function getKitchenHistoryAction(timeRange: "today" | "week" | "all
     const history = await prisma.order.findMany({
       where: {
         restaurantId,
-        status: {
-          in: [OrderStatus.READY, OrderStatus.SERVED, OrderStatus.PAID],
-        },
-        ...(dateFilter ? { updatedAt: dateFilter } : {}),
+        ...(dateFilter ? { createdAt: dateFilter } : {}),
       },
       include: {
         items: {
@@ -197,7 +204,7 @@ export async function getKitchenHistoryAction(timeRange: "today" | "week" | "all
         table: true,
       },
       orderBy: {
-        updatedAt: "desc",
+        createdAt: "desc",
       },
     });
 
