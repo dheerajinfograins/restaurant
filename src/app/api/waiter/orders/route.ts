@@ -7,10 +7,20 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get("status");
+    const waiterIdParam = searchParams.get("waiterId");
+    const mineParam = searchParams.get("mine");
 
     // Try to get restaurantId from JWT token or fallback
     const payload = await getOptionalPayload();
     let restaurantId = payload?.restaurantId || searchParams.get("restaurantId");
+
+    // Touch lastLoginAt timestamp as active presence heartbeat
+    if (payload?.id && payload?.role === "WAITER") {
+      void prisma.user.update({
+        where: { id: payload.id },
+        data: { lastLoginAt: new Date() },
+      }).catch(() => {});
+    }
 
     if (!restaurantId) {
       const defaultRestaurant = await prisma.restaurant.findFirst();
@@ -24,6 +34,13 @@ export async function GET(request: Request) {
     const whereClause: Prisma.OrderWhereInput = {
       restaurantId,
     };
+
+    // Filter by specific waiter or 'mine'
+    if (mineParam === "true" && payload?.id) {
+      whereClause.waiterId = payload.id;
+    } else if (waiterIdParam) {
+      whereClause.waiterId = waiterIdParam;
+    }
 
     if (statusParam) {
       const upper = statusParam.toUpperCase();
@@ -69,7 +86,13 @@ export async function GET(request: Request) {
             tableNumber: true,
             capacity: true,
             status: true,
-
+          },
+        },
+        waiter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
       },
@@ -87,16 +110,24 @@ export async function GET(request: Request) {
       totalAmount: Number(order.totalAmount),
       status: order.status,
       paymentMethod: order.paymentMethod,
+      waiterId: order.waiterId,
+      waiter: order.waiter
+        ? {
+            id: order.waiter.id,
+            name: order.waiter.name,
+            email: order.waiter.email,
+          }
+        : null,
       table: {
         id: order.table?.id || "",
         tableNumber: order.table?.tableNumber || "Takeaway",
         capacity: order.table?.capacity || 4,
       },
-      items: order.items.map((item) => ({
+      items: (order.items || []).map((item) => ({
         id: item.id,
-        quantity: item.quantity,
-        unitPrice: Number(item.unitPrice),
-        totalPrice: Number(item.totalPrice),
+        quantity: item.quantity || 1,
+        unitPrice: Number(item.unitPrice || 0),
+        totalPrice: Number(item.totalPrice || 0),
         product: {
           id: item.product?.id || "",
           name: item.product?.name || "Dish Item",
@@ -104,13 +135,14 @@ export async function GET(request: Request) {
           image: item.product?.image || null,
         },
       })),
-      createdAt: order.createdAt.toISOString(),
-      updatedAt: order.updatedAt.toISOString(),
+      createdAt: order.createdAt ? order.createdAt.toISOString() : new Date().toISOString(),
+      updatedAt: order.updatedAt ? order.updatedAt.toISOString() : new Date().toISOString(),
     }));
 
     return NextResponse.json(formattedOrders);
   } catch (error) {
     console.error("Failed to fetch waiter orders:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json([], { status: 200 });
   }
 }
+

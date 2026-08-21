@@ -1,9 +1,13 @@
 import { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import WaiterSidebar from "@/components/layouts/waiter-sidebar";
 import Navbar from "@/components/dashboard/navbar";
 import { SocketProvider } from "@/components/providers/socket-provider";
+import { WaiterUserProvider, WaiterUser } from "@/components/providers/waiter-user-provider";
 import { prisma } from "@/lib/prisma";
 import { getOptionalPayload } from "@/lib/permissions";
+
+import { WaiterAlertListener } from "@/components/waiter/WaiterAlertListener";
 
 export default async function WaiterLayout({
   children,
@@ -11,43 +15,59 @@ export default async function WaiterLayout({
   children: ReactNode;
 }>) {
   const payload = await getOptionalPayload();
-  const role = payload?.role || "WAITER";
+  if (!payload) {
+    redirect("/login");
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: payload.id },
+    include: { restaurant: true }
+  });
+
+  if (!dbUser?.isActive) {
+    redirect("/login");
+  }
+
+  const role = dbUser.role || "WAITER";
   
   // Fetch Restaurant & User Data
   let restaurantName = "Culinary Ledger";
-  let user = { name: "Waiter", email: "waiter@example.com", role };
+  const user: WaiterUser = {
+    id: dbUser.id,
+    name: dbUser.name,
+    email: dbUser.email,
+    role,
+    image: dbUser.image,
+    restaurantId: dbUser.restaurantId || undefined,
+  };
 
-  if (payload) {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: payload.id },
-      include: { restaurant: true }
-    });
-    
-    if (dbUser) {
-      user = { name: dbUser.name, email: dbUser.email, role: dbUser.role };
-      if (dbUser.restaurant) {
-        restaurantName = dbUser.restaurant.name;
-      }
-    }
+  if (dbUser.restaurant) {
+    restaurantName = dbUser.restaurant.name;
   }
 
-  const restaurantId = payload ? (await prisma.user.findUnique({ where: { id: payload.id } }))?.restaurantId : undefined;
+  const restaurantId = user.restaurantId || (payload ? (await prisma.user.findUnique({ where: { id: payload.id } }))?.restaurantId : undefined);
 
   return (
     <SocketProvider restaurantId={restaurantId || undefined}>
-      <div className="flex h-screen overflow-hidden bg-culinary-background">
-        <WaiterSidebar restaurantName={restaurantName} />
+      <WaiterUserProvider user={user}>
+        <WaiterAlertListener />
+        <div className="flex h-screen overflow-hidden bg-culinary-background">
+          <WaiterSidebar restaurantName={restaurantName} />
 
-        <div className="flex-1 flex flex-col w-full h-full relative">
-          <Navbar user={user} />
-
-          <main className="flex-1 overflow-auto p-4 md:p-6 w-full">
-            <div className="max-w-7xl mx-auto space-y-8">
-              {children}
+          <div className="flex-1 flex flex-col w-full h-full relative overflow-hidden">
+            <div className="hidden md:block">
+              <Navbar user={user} restaurantName={restaurantName} />
             </div>
-          </main>
+
+            <main className="flex-1 overflow-y-auto p-0 md:p-6 w-full">
+              <div className="max-w-7xl mx-auto md:space-y-8 min-h-full">
+                {children}
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
+      </WaiterUserProvider>
     </SocketProvider>
   );
 }
+

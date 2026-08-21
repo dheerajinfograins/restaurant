@@ -42,27 +42,63 @@ interface ProductFormModalProps {
   readonly categories: ICategory[];
 }
 
-const processImageFile = (
+const EDIT_MODAL_LABELS = {
+  title: "Edit Product",
+  button: "Update Product",
+  loading: "Updating...",
+};
+
+const ADD_MODAL_LABELS = {
+  title: "Add New Product",
+  button: "Create Product",
+  loading: "Creating...",
+};
+
+const processImageFile = async (
   file: File,
-  onSuccess: (base64: string) => void
+  setIsUploading: (uploading: boolean) => void,
+  onSuccess: (url: string) => void
 ) => {
   if (!file.type.startsWith("image/")) {
-    toast.error("Please upload an image file");
+    toast.error("Please upload a valid image file (PNG, JPG, WEBP)");
     return;
   }
-  // Limit to 2MB since it's converted to base64
-  if (file.size > 2 * 1024 * 1024) {
-    toast.error("Image must be less than 2MB");
+  if (file.size > 10 * 1024 * 1024) {
+    toast.error("Image size must be less than 10MB");
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    if (event.target?.result) {
-      onSuccess(event.target.result as string);
+  setIsUploading(true);
+  const toastId = toast.loading("Uploading image to Cloudinary...");
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("folder", "products");
+
+    const response = await axios.post("/api/upload?folder=products", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    const uploadedUrl = response.data?.data?.url;
+    if (uploadedUrl) {
+      onSuccess(uploadedUrl);
+      toast.success("Image uploaded to Cloudinary!", { id: toastId });
+    } else {
+      toast.error("Upload succeeded but no image URL received", { id: toastId });
     }
-  };
-  reader.readAsDataURL(file);
+  } catch (error: unknown) {
+    console.error("Cloudinary upload failed:", error);
+    let errMsg = "Failed to upload image to Cloudinary";
+    if (axios.isAxiosError(error)) {
+      errMsg = error.response?.data?.message || errMsg;
+    }
+    toast.error(errMsg, { id: toastId });
+  } finally {
+    setIsUploading(false);
+  }
 };
 
 async function submitProductForm(
@@ -127,6 +163,178 @@ const getDefaultFormValues = (product: IProduct | null): FormValues => {
   };
 };
 
+interface ImageDropzoneProps {
+  readonly currentImage?: string | null;
+  readonly isUploading: boolean;
+  readonly onDropFile: (file?: File) => void;
+  readonly onClearImage: () => void;
+}
+
+function ImageDropzone({
+  currentImage,
+  isUploading,
+  onDropFile,
+  onClearImage,
+}: ImageDropzoneProps) {
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    onDropFile(e.dataTransfer.files?.[0]);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onDropFile(e.target.files?.[0]);
+  };
+
+  const borderClass = currentImage
+    ? "border-culinary-primary/30 bg-white"
+    : "border-culinary-border hover:border-culinary-primary/50 hover:bg-white";
+
+  return (
+    <div
+      className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all ${borderClass} group relative overflow-hidden`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      <button
+        type="button"
+        disabled={isUploading}
+        className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-culinary-primary focus-visible:ring-inset bg-transparent border-none z-0 disabled:cursor-not-allowed"
+        onClick={() => document.getElementById("product-image-upload")?.click()}
+        aria-label="Upload product image"
+      />
+      {currentImage ? (
+        <div className="relative w-full aspect-video flex items-center justify-center pointer-events-none">
+          <Image
+            src={currentImage}
+            alt="Preview"
+            width={400}
+            height={192}
+            className="max-h-48 w-auto object-contain rounded-md shadow-sm"
+          />
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center rounded-md text-white">
+            {isUploading ? (
+              <Loader2 size={24} className="mb-2 animate-spin" />
+            ) : (
+              <UploadCloud size={24} className="mb-2" />
+            )}
+            <span className="text-sm font-medium">
+              {isUploading ? "Uploading to Cloudinary..." : "Click or Drop to Replace"}
+            </span>
+          </div>
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            disabled={isUploading}
+            className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClearImage();
+            }}
+          >
+            <X size={14} />
+          </Button>
+        </div>
+      ) : (
+        <div className="text-center py-4 pointer-events-none">
+          <div className="w-12 h-12 bg-culinary-background rounded-full flex items-center justify-center mx-auto mb-3 text-culinary-muted group-hover:text-culinary-primary group-hover:bg-culinary-primary/10 transition-colors">
+            {isUploading ? (
+              <Loader2 size={24} className="animate-spin text-culinary-primary" />
+            ) : (
+              <UploadCloud size={24} />
+            )}
+          </div>
+          <p className="text-sm font-medium text-culinary-text">
+            {isUploading ? "Uploading to Cloudinary..." : "Click or drag image here"}
+          </p>
+          <p className="text-xs text-culinary-muted mt-1">JPEG, PNG, WEBP (Max 10MB)</p>
+        </div>
+      )}
+      <input
+        type="file"
+        id="product-image-upload"
+        className="hidden"
+        accept="image/*"
+        onChange={handleFileInput}
+      />
+    </div>
+  );
+}
+
+interface ProductImageFieldProps {
+  readonly currentImage?: string | null;
+  readonly isUploading: boolean;
+  readonly onDropFile: (file?: File, onComplete?: () => void) => void;
+  readonly onClearImage: () => void;
+  readonly register: ReturnType<typeof useForm<FormValues>>["register"];
+}
+
+function ProductImageField({
+  currentImage,
+  isUploading,
+  onDropFile,
+  onClearImage,
+  register,
+}: ProductImageFieldProps) {
+  const [useUrlInput, setUseUrlInput] = useState<boolean | null>(null);
+  const showUrlInput =
+    useUrlInput ?? Boolean(currentImage && !currentImage.startsWith("data:image"));
+
+  const handleFileSelect = (file?: File) => {
+    onDropFile(file, () => {
+      setUseUrlInput(false);
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-semibold text-culinary-text">Product Image</Label>
+      {!showUrlInput ? (
+        <ImageDropzone
+          currentImage={currentImage}
+          isUploading={isUploading}
+          onDropFile={handleFileSelect}
+          onClearImage={onClearImage}
+        />
+      ) : (
+        <div className="relative">
+          <Input
+            placeholder="https://example.com/image.jpg"
+            {...register("image")}
+            className="bg-white border-culinary-border focus:ring-culinary-primary/20 transition-all shadow-sm pr-10"
+          />
+          {currentImage && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded bg-gray-100 overflow-hidden shadow-sm border border-gray-200">
+              <Image
+                src={currentImage}
+                alt="preview"
+                width={24}
+                height={24}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-between items-center text-xs">
+        <button
+          type="button"
+          onClick={() => setUseUrlInput(!showUrlInput)}
+          className="text-culinary-primary hover:underline font-medium"
+        >
+          {showUrlInput ? "Upload Image File Instead" : "Or enter Image URL instead"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ProductFormModal({
   isOpen,
   onClose,
@@ -135,51 +343,28 @@ export function ProductFormModal({
   categories,
 }: ProductFormModalProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
-  const [prevProductId, setPrevProductId] = useState(product?.id);
-  const isEditing = !!product;
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  if (isOpen !== prevIsOpen || product?.id !== prevProductId) {
-    setPrevIsOpen(isOpen);
-    setPrevProductId(product?.id);
-    if (isOpen) {
-      const hasExternalImage = Boolean(product?.image && !product.image.startsWith("data:image"));
-      setShowUrlInput(hasExternalImage);
-    }
-  }
+  const isEditing = Boolean(product);
+  const modalLabels = isEditing ? EDIT_MODAL_LABELS : ADD_MODAL_LABELS;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(createProductSchema) as unknown as Resolver<FormValues>,
     defaultValues: getDefaultFormValues(product),
   });
 
-  // Reset form when modal opens or selected product changes
   useEffect(() => {
     if (isOpen) {
       form.reset(getDefaultFormValues(product));
     }
   }, [isOpen, product, form]);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleImageSelect = (file?: File) => {
+  const handleImageSelect = (file?: File, onComplete?: () => void) => {
     if (!file) return;
-    processImageFile(file, (base64) => {
-      form.setValue("image", base64);
-      setShowUrlInput(false);
+    void processImageFile(file, setIsUploadingImage, (uploadedUrl) => {
+      form.setValue("image", uploadedUrl);
+      onComplete?.();
     });
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    handleImageSelect(e.dataTransfer.files?.[0]);
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleImageSelect(e.target.files?.[0]);
   };
 
   const onSubmit = (data: FormValues) => {
@@ -192,10 +377,6 @@ export function ProductFormModal({
   const foodTypeValue = useWatch({ control: form.control, name: "foodType" });
   const isAvailableValue = useWatch({ control: form.control, name: "isAvailable" });
   const isFeaturedValue = useWatch({ control: form.control, name: "isFeatured" });
-
-  const modalLabels = isEditing
-    ? { title: "Edit Product", button: "Update Product", loading: "Updating..." }
-    : { title: "Add New Product", button: "Create Product", loading: "Creating..." };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) onClose();
@@ -214,85 +395,13 @@ export function ProductFormModal({
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-8">
           <div className="space-y-6">
-
-            {/* Image Upload Area */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold text-culinary-text">Product Image</Label>
-              {!showUrlInput ? (
-                <div
-                  className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-all ${currentImage ? 'border-culinary-primary/30 bg-white' : 'border-culinary-border hover:border-culinary-primary/50 hover:bg-white'} group relative overflow-hidden`}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
-                >
-                  <button
-                    type="button"
-                    className="absolute inset-0 w-full h-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-culinary-primary focus-visible:ring-inset bg-transparent border-none z-0"
-                    onClick={() => document.getElementById('product-image-upload')?.click()}
-                    aria-label="Upload product image"
-                  />
-                  {currentImage ? (
-                    <div className="relative w-full aspect-video flex items-center justify-center pointer-events-none">
-                      <Image src={currentImage} alt="Preview" width={400} height={192} className="max-h-48 w-auto object-contain rounded-md shadow-sm" />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center rounded-md text-white">
-                        <UploadCloud size={24} className="mb-2" />
-                        <span className="text-sm font-medium">Click or Drop to Replace</span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-7 w-7 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-10"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          form.setValue("image", "");
-                        }}
-                      >
-                        <X size={14} />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="text-center py-4 pointer-events-none">
-                      <div className="w-12 h-12 bg-culinary-background rounded-full flex items-center justify-center mx-auto mb-3 text-culinary-muted group-hover:text-culinary-primary group-hover:bg-culinary-primary/10 transition-colors">
-                        <UploadCloud size={24} />
-                      </div>
-                      <p className="text-sm font-medium text-culinary-text">Click or drag image here</p>
-                      <p className="text-xs text-culinary-muted mt-1">JPEG, PNG, WEBP (Max 2MB)</p>
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    id="product-image-upload"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleFileInput}
-                  />
-                </div>
-              ) : (
-                <div className="relative">
-                  <Input
-                    placeholder="https://example.com/image.jpg"
-                    {...form.register("image")}
-                    className="bg-white border-culinary-border focus:ring-culinary-primary/20 transition-all shadow-sm pr-10"
-                  />
-                  {currentImage && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded bg-gray-100 overflow-hidden shadow-sm border border-gray-200">
-                      <Image src={currentImage} alt="preview" width={24} height={24} className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-between items-center text-xs">
-                <button
-                  type="button"
-                  onClick={() => setShowUrlInput(!showUrlInput)}
-                  className="text-culinary-primary hover:underline font-medium"
-                >
-                  {showUrlInput ? "Upload Image File Instead" : "Or enter Image URL instead"}
-                </button>
-              </div>
-            </div>
+            <ProductImageField
+              currentImage={currentImage}
+              isUploading={isUploadingImage}
+              onDropFile={handleImageSelect}
+              onClearImage={() => form.setValue("image", "")}
+              register={form.register}
+            />
 
             {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

@@ -1,23 +1,7 @@
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
-import { verifyAccessToken } from "@/lib/jwt";
+import { getAuthenticatedRestaurantId } from "@/lib/permissions";
 import { productController } from "@/modules/product";
 import { handleError } from "@/helpers/error-handler";
-import { AppError, HTTP_STATUS } from "@/exceptions";
-
-async function getRestaurantId() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
-  
-  const payload = verifyAccessToken(token);
-  
-  if (!payload.restaurantId && payload.role !== "SUPER_ADMIN") {
-    throw new AppError("No restaurant associated with this user", HTTP_STATUS.FORBIDDEN);
-  }
-  
-  return payload.restaurantId || "super-admin-restaurant";
-}
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +9,7 @@ export async function GET(
 ) {
   try {
     const params = await props.params;
-    const restaurantId = await getRestaurantId();
+    const restaurantId = await getAuthenticatedRestaurantId();
     return await productController.getProduct(params.id, restaurantId);
   } catch (error) {
     return handleError(error);
@@ -38,7 +22,7 @@ export async function PUT(
 ) {
   try {
     const params = await props.params;
-    const restaurantId = await getRestaurantId();
+    const restaurantId = await getAuthenticatedRestaurantId();
     const body = await request.json();
     return await productController.updateProduct(params.id, restaurantId, body);
   } catch (error) {
@@ -52,9 +36,10 @@ export async function DELETE(
 ) {
   try {
     const params = await props.params;
-    const restaurantId = await getRestaurantId();
+    const restaurantId = await getAuthenticatedRestaurantId();
     return await productController.deleteProduct(params.id, restaurantId);
   } catch (error) {
     return handleError(error);
   }
 }
+

@@ -25,23 +25,41 @@ export async function PATCH(
           },
         },
         table: true,
+        waiter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
-    // Emit live socket event if socket.io is initialized
+
+    // Emit live socket event once if socket.io is initialized
     // @ts-expect-error - global.io is set in server.ts
     if (global.io) {
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:updated", updatedOrder);
-      if (status === "READY") {
+      if (updatedOrder.restaurantId) {
         // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:ready", updatedOrder);
-      } else if (status === "SERVED") {
+        global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:updated", updatedOrder);
+        if (status === "READY") {
+          // @ts-expect-error - global.io is set in server.ts
+          global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:ready", updatedOrder);
+        } else if (status === "SERVED") {
+          // @ts-expect-error - global.io is set in server.ts
+          global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:served", updatedOrder);
+        }
+      } else {
         // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:served", updatedOrder);
+        global.io.emit("order:updated", updatedOrder);
+        if (status === "READY") {
+          // @ts-expect-error - global.io is set in server.ts
+          global.io.emit("order:ready", updatedOrder);
+        } else if (status === "SERVED") {
+          // @ts-expect-error - global.io is set in server.ts
+          global.io.emit("order:served", updatedOrder);
+        }
       }
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.emit("order:updated", updatedOrder);
     }
 
     return NextResponse.json({ success: true, order: updatedOrder });

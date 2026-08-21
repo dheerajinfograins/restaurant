@@ -69,10 +69,13 @@ export async function acceptOrderAction(orderId: string) {
 
     // @ts-expect-error - global.io is set in server.ts
     if (global.io) {
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.emit("order:updated", order);
+      if (order.restaurantId) {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
+      } else {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.emit("order:updated", order);
+      }
     }
 
     revalidatePath("/dashboard/kitchen");
@@ -92,15 +95,29 @@ export async function markAsReadyAction(orderId: string) {
       include: {
         items: { include: { product: true } },
         table: true,
+        waiter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
     // @ts-expect-error - global.io is set in server.ts
     if (global.io) {
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.to(`restaurant:${order.restaurantId}`).emit("order:ready", order);
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.emit("order:updated", order);
+      if (order.restaurantId) {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.to(`restaurant:${order.restaurantId}`).emit("order:ready", order);
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
+      } else {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.emit("order:ready", order);
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.emit("order:updated", order);
+      }
     }
 
     revalidatePath("/dashboard/kitchen");
@@ -120,16 +137,31 @@ export async function markAsServedAction(orderId: string) {
       include: {
         items: { include: { product: true } },
         table: true,
+        waiter: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
     // @ts-expect-error - global.io is set in server.ts
     if (global.io) {
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.to(`restaurant:${order.restaurantId}`).emit("order:served", order);
-      // @ts-expect-error - global.io is set in server.ts
-      global.io.emit("order:updated", order);
+      if (order.restaurantId) {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.to(`restaurant:${order.restaurantId}`).emit("order:served", order);
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
+      } else {
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.emit("order:served", order);
+        // @ts-expect-error - global.io is set in server.ts
+        global.io.emit("order:updated", order);
+      }
     }
+
 
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/orders");

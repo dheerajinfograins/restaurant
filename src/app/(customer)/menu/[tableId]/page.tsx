@@ -47,6 +47,43 @@ export default async function MenuHomePage({
     where: { restaurantId: restaurant.id },
   });
 
+  // If Admin disabled the digital menu via Publish Switch
+  if (settings?.qrMenuStatus === false) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] flex flex-col items-center justify-center p-6 text-center selection:bg-amber-700 selection:text-white">
+        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-stone-200/90 shadow-2xl shadow-stone-950/10 space-y-5 animate-in fade-in zoom-in-95 duration-300">
+          <div className="w-20 h-20 rounded-3xl bg-amber-50 border border-amber-200 text-amber-800 mx-auto flex items-center justify-center shadow-inner">
+            <UtensilsCrossed size={36} className="text-amber-700" />
+          </div>
+
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-200 text-rose-800 rounded-full text-xs font-bold uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span>Menu Temporarily Offline</span>
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-bold font-cormorant text-stone-900 leading-tight">
+              {restaurant.name || "The Culinary Ledger"}
+            </h1>
+            <p className="text-xs sm:text-sm text-stone-500 leading-relaxed">
+              Our digital QR menu is temporarily paused for updates. Please ask your table server or waiter for the physical menu card.
+            </p>
+          </div>
+
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200/70 text-xs text-stone-600 space-y-1">
+            <p className="font-bold text-stone-800">Table {table.tableNumber}</p>
+            <p className="text-[11px] text-stone-400">Our waitstaff is available at your service on the floor.</p>
+          </div>
+
+          {restaurant.phone && (
+            <p className="text-xs text-stone-400 pt-2 border-t border-stone-100">
+              Assistance Hotline: <strong className="text-stone-700">{restaurant.phone}</strong>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FDFBF7] pb-32">
       <MenuClientInit

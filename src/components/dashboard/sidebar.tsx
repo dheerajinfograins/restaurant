@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -17,10 +18,12 @@ import {
   Store,
   Settings,
   History,
+  UtensilsCrossed,
 } from "lucide-react";
 
 export const sidebarLinks = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "CASHIER"] },
+  { name: "Floor Operations", href: "/dashboard/floor", icon: UtensilsCrossed, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Menu Management", href: "/dashboard/menu", icon: MenuSquare, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Categories", href: "/dashboard/categories", icon: Folder, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Products", href: "/dashboard/products", icon: Package, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
@@ -37,22 +40,56 @@ export const sidebarLinks = [
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
 ];
 
-export default function Sidebar({ role, restaurantName = "Culinary Ledger" }: Readonly<{ role: string, restaurantName?: string }>) {
+const isConfiguredRemoteDomain = (url?: string | null) => {
+  if (!url) return false;
+  return (
+    url.startsWith("https://images.unsplash.com") ||
+    url.startsWith("https://res.cloudinary.com")
+  );
+};
+
+export default function Sidebar({
+  role,
+  restaurantName = "Culinary Ledger",
+  logo = null,
+}: Readonly<{ role: string; restaurantName?: string; logo?: string | null }>) {
   const pathname = usePathname();
   
   const filteredLinks = sidebarLinks.filter(link => link.roles.includes(role));
 
+  // Compute initials from restaurant name (e.g. "The Daily Grind" -> "TG" or "TH")
+  const words = restaurantName.trim().split(/\s+/).filter(Boolean);
+  const initials = words.length > 1 
+    ? (words[0][0] + words[1][0]).toUpperCase()
+    : restaurantName.slice(0, 2).toUpperCase() || "CL";
+
   return (
     <aside className="w-64 flex-shrink-0 border-r border-culinary-border/50 bg-culinary-card/50 backdrop-blur-md hidden md:flex flex-col h-full transition-all duration-300">
-      <div className="h-20 flex items-center px-6 border-b border-culinary-border/50">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          {/* We'll use a text version of the brand for the sidebar to fit nicely */}
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-culinary-primary to-culinary-secondary flex items-center justify-center text-white font-cormorant font-bold text-lg shadow-sm">
-            C
+      <div className="h-20 flex items-center px-4 border-b border-culinary-border/50">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-3 w-full min-w-0 group"
+          title={restaurantName}
+        >
+          {logo ? (
+            <Image
+              src={logo}
+              alt={restaurantName}
+              width={36}
+              height={36}
+              unoptimized={!isConfiguredRemoteDomain(logo)}
+              className="w-9 h-9 rounded-xl object-cover border border-culinary-border/80 shadow-xs shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-culinary-primary to-culinary-secondary flex items-center justify-center text-white font-cormorant font-bold text-sm shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+              {initials}
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <span className="font-cormorant font-bold text-base leading-tight text-culinary-text block line-clamp-2 break-words group-hover:text-culinary-primary transition-colors">
+              {restaurantName}
+            </span>
           </div>
-          <span className="font-cormorant font-semibold text-xl tracking-tight text-culinary-text truncate max-w-[150px]">
-            {restaurantName}
-          </span>
         </Link>
       </div>
 

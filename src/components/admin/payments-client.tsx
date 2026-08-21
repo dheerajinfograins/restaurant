@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { io, Socket } from "socket.io-client";
 import Link from "next/link";
+import { isOrderPaid } from "@/lib/order-payment";
 
 interface PaymentOrder {
   id: string;
@@ -97,7 +98,8 @@ function calculateKpiStats(orders: PaymentOrder[]): KpiStats {
 
   for (const o of orders) {
     const amt = Number(o.totalAmount || 0);
-    if (o.status === "PAID") {
+    const paid = isOrderPaid(o);
+    if (paid) {
       totalCollected += amt;
       paidCount++;
       if (o.paymentMethod === "CASH") {
@@ -127,7 +129,8 @@ function calculateKpiStats(orders: PaymentOrder[]): KpiStats {
 function calculateFilterCounts(orders: PaymentOrder[]): Record<string, number> {
   const counts: Record<string, number> = { ALL: orders.length };
   for (const o of orders) {
-    if (o.status === "PAID") {
+    const paid = isOrderPaid(o);
+    if (paid) {
       counts["PAID"] = (counts["PAID"] || 0) + 1;
       const method = o.paymentMethod || "UPI";
       counts[method] = (counts[method] || 0) + 1;
@@ -139,20 +142,21 @@ function calculateFilterCounts(orders: PaymentOrder[]): Record<string, number> {
 }
 
 function isOrderFilterMatch(order: PaymentOrder, filterType: string): boolean {
+  const paid = isOrderPaid(order);
   if (filterType === "PENDING") {
-    return order.status !== "PAID" && order.status !== "CANCELLED";
+    return !paid && order.status !== "CANCELLED";
   }
   if (filterType === "PAID") {
-    return order.status === "PAID";
+    return paid;
   }
   if (filterType === "CASH") {
-    return order.status === "PAID" && order.paymentMethod === "CASH";
+    return paid && order.paymentMethod === "CASH";
   }
   if (filterType === "UPI") {
-    return order.status === "PAID" && (order.paymentMethod === "UPI" || !order.paymentMethod);
+    return paid && (order.paymentMethod === "UPI" || !order.paymentMethod);
   }
   if (filterType === "CARD") {
-    return order.status === "PAID" && order.paymentMethod === "CARD";
+    return paid && order.paymentMethod === "CARD";
   }
   return true;
 }
@@ -333,7 +337,7 @@ function PaymentCardsView({
     <div className="p-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {orders.map((order) => {
-          const isPaid = order.status === "PAID";
+          const isPaid = isOrderPaid(order);
           return (
             <div
               key={order.id}
@@ -538,7 +542,7 @@ function PaymentTableView({
         </TableHeader>
         <TableBody className="divide-y divide-gray-100">
           {orders.map((order) => {
-            const isPaid = order.status === "PAID";
+            const isPaid = isOrderPaid(order);
             return (
               <TableRow key={order.id} className="hover:bg-gray-50/70 transition-colors group">
                 {/* Order Number */}
@@ -689,6 +693,85 @@ function PaymentTableView({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+interface PaymentEmptyStateProps {
+  isFiltered: boolean;
+  onResetFilters: () => void;
+}
+
+function PaymentEmptyState({ isFiltered, onResetFilters }: Readonly<PaymentEmptyStateProps>) {
+  return (
+    <div className="flex flex-col items-center justify-center p-16 text-center">
+      <div className="p-4 bg-gray-50 rounded-2xl mb-3 border border-gray-100">
+        <ShoppingBag className="h-10 w-10 text-gray-300" />
+      </div>
+      <h3 className="text-base font-bold text-gray-800">
+        {isFiltered
+          ? "No billing records match your filter criteria"
+          : "No payment records available"}
+      </h3>
+      <p className="text-xs text-gray-500 mt-1 max-w-sm">
+        {isFiltered
+          ? "Try clearing your search query or selecting a different filter tab."
+          : "Customer bills and payment records will automatically appear here."}
+      </p>
+      {isFiltered && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-4 text-xs rounded-xl"
+          onClick={onResetFilters}
+        >
+          Reset All Filters
+        </Button>
+      )}
+    </div>
+  );
+}
+
+interface PaymentContentViewProps {
+  orders: PaymentOrder[];
+  viewMode: "cards" | "table";
+  isFiltered: boolean;
+  onResetFilters: () => void;
+  onViewOrder: (order: PaymentOrder) => void;
+  onOpenCollectModal: (order: PaymentOrder) => void;
+  onUpdateMethod: (orderId: string, method: PaymentMethod) => void;
+}
+
+function PaymentContentView({
+  orders,
+  viewMode,
+  isFiltered,
+  onResetFilters,
+  onViewOrder,
+  onOpenCollectModal,
+  onUpdateMethod,
+}: Readonly<PaymentContentViewProps>) {
+  if (orders.length === 0) {
+    return <PaymentEmptyState isFiltered={isFiltered} onResetFilters={onResetFilters} />;
+  }
+
+  if (viewMode === "cards") {
+    return (
+      <PaymentCardsView
+        orders={orders}
+        onViewOrder={onViewOrder}
+        onOpenCollectModal={onOpenCollectModal}
+        onUpdateMethod={onUpdateMethod}
+      />
+    );
+  }
+
+  return (
+    <PaymentTableView
+      orders={orders}
+      onViewOrder={onViewOrder}
+      onOpenCollectModal={onOpenCollectModal}
+      onUpdateMethod={onUpdateMethod}
+    />
   );
 }
 
@@ -957,18 +1040,21 @@ function PaymentDetailsSheet({
                   {order?.createdAt ? format(order.createdAt, "MMMM d, yyyy - h:mm a") : ""}
                 </p>
               </div>
-              {order && (
-                <Badge
-                  variant={order.status === "PAID" ? "default" : "secondary"}
-                  className={
-                    order.status === "PAID"
-                      ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none px-3 py-1 text-xs font-semibold"
-                      : "bg-amber-50 text-amber-700 border-amber-200 shadow-none px-3 py-1 text-xs font-semibold"
-                  }
-                >
-                  {order.status === "PAID" ? "PAID" : "UNPAID"}
-                </Badge>
-              )}
+              {order && (() => {
+                const isPaid = isOrderPaid(order);
+                return (
+                  <Badge
+                    variant={isPaid ? "default" : "secondary"}
+                    className={
+                      isPaid
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none px-3 py-1 text-xs font-semibold"
+                        : "bg-amber-50 text-amber-700 border-amber-200 shadow-none px-3 py-1 text-xs font-semibold"
+                    }
+                  >
+                    {isPaid ? "PAID" : "UNPAID"}
+                  </Badge>
+                );
+              })()}
             </div>
           </SheetHeader>
 
@@ -999,7 +1085,7 @@ function PaymentDetailsSheet({
                     <PaymentMethodDropdown order={order} onUpdateMethod={onUpdateMethod} />
                   </div>
 
-                  {order.status !== "PAID" && (
+                  {!isOrderPaid(order) && (
                     <Button
                       size="sm"
                       onClick={() => onCollectPayment(order)}
@@ -1382,47 +1468,15 @@ export function PaymentsClient() {
         </div>
 
         {/* Content Section: Cards Grid View OR Table List View */}
-        {paginatedOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center">
-            <div className="p-4 bg-gray-50 rounded-2xl mb-3 border border-gray-100">
-              <ShoppingBag className="h-10 w-10 text-gray-300" />
-            </div>
-            <h3 className="text-base font-bold text-gray-800">
-              {isFiltered
-                ? "No billing records match your filter criteria"
-                : "No payment records available"}
-            </h3>
-            <p className="text-xs text-gray-500 mt-1 max-w-sm">
-              {isFiltered
-                ? "Try clearing your search query or selecting a different filter tab."
-                : "Customer bills and payment records will automatically appear here."}
-            </p>
-            {isFiltered && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-xs rounded-xl"
-                onClick={handleResetFilters}
-              >
-                Reset All Filters
-              </Button>
-            )}
-          </div>
-        ) : viewMode === "cards" ? (
-          <PaymentCardsView
-            orders={paginatedOrders}
-            onViewOrder={setViewOrder}
-            onOpenCollectModal={handleOpenCollectModal}
-            onUpdateMethod={updatePaymentMethod}
-          />
-        ) : (
-          <PaymentTableView
-            orders={paginatedOrders}
-            onViewOrder={setViewOrder}
-            onOpenCollectModal={handleOpenCollectModal}
-            onUpdateMethod={updatePaymentMethod}
-          />
-        )}
+        <PaymentContentView
+          orders={paginatedOrders}
+          viewMode={viewMode}
+          isFiltered={isFiltered}
+          onResetFilters={handleResetFilters}
+          onViewOrder={setViewOrder}
+          onOpenCollectModal={handleOpenCollectModal}
+          onUpdateMethod={updatePaymentMethod}
+        />
 
         {/* Integrated Pagination Footer */}
         {filteredOrders.length > 0 && (

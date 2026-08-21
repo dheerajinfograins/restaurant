@@ -32,6 +32,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { io, Socket } from "socket.io-client";
+import { isOrderPaid } from "@/lib/order-payment";
 
 interface OrderData {
   id: string;
@@ -394,16 +395,21 @@ function OrderTableView({
 
               {/* Payment Status */}
               <TableCell className="align-top py-4 text-center">
-                <Badge
-                  variant={order.status === "PAID" ? "default" : "secondary"}
-                  className={
-                    order.status === "PAID"
-                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50 shadow-none border border-emerald-200 text-[11px] font-semibold"
-                      : "bg-amber-50 text-amber-700 hover:bg-amber-50 shadow-none border border-amber-200 text-[11px] font-semibold"
-                  }
-                >
-                  {order.status === "PAID" ? "Paid" : "Unpaid"}
-                </Badge>
+                {(() => {
+                  const paid = isOrderPaid(order);
+                  return (
+                    <Badge
+                      variant={paid ? "default" : "secondary"}
+                      className={
+                        paid
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-50 shadow-none border border-emerald-200 text-[11px] font-semibold"
+                          : "bg-amber-50 text-amber-700 hover:bg-amber-50 shadow-none border border-amber-200 text-[11px] font-semibold"
+                      }
+                    >
+                      {paid ? "Paid" : "Unpaid"}
+                    </Badge>
+                  );
+                })()}
               </TableCell>
 
               {/* Order Status */}
@@ -549,16 +555,21 @@ function OrderCardsView({
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <Badge
-                    variant={order.status === "PAID" ? "default" : "secondary"}
-                    className={
-                      order.status === "PAID"
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none text-[11px] font-semibold"
-                        : "bg-amber-50 text-amber-700 border-amber-200 shadow-none text-[11px] font-semibold"
-                    }
-                  >
-                    {order.status === "PAID" ? "PAID" : "UNPAID"}
-                  </Badge>
+                  {(() => {
+                    const paid = isOrderPaid(order);
+                    return (
+                      <Badge
+                        variant={paid ? "default" : "secondary"}
+                        className={
+                          paid
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none text-[11px] font-semibold"
+                            : "bg-amber-50 text-amber-700 border-amber-200 shadow-none text-[11px] font-semibold"
+                        }
+                      >
+                        {paid ? "PAID" : "UNPAID"}
+                      </Badge>
+                    );
+                  })()}
                   {getStatusBadge(order.status)}
                 </div>
               </div>
@@ -779,31 +790,38 @@ function OrderDetailsSheet({
                 </div>
                 <div className="flex-1 bg-white border border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center shadow-sm">
                   <p className="text-[10px] text-gray-500 font-bold mb-1 uppercase tracking-widest">Payment Status</p>
-                  <Badge
-                    variant={order.status === "PAID" ? "default" : "secondary"}
-                    className={
-                      order.status === "PAID"
-                        ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none px-3 py-1 text-xs font-semibold"
-                        : "bg-amber-50 text-amber-700 border-amber-200 shadow-none px-3 py-1 text-xs font-semibold"
-                    }
-                  >
-                    {order.status === "PAID" ? "Paid" : "Unpaid"}
-                  </Badge>
+                  {(() => {
+                    const paid = isOrderPaid(order);
+                    return (
+                      <>
+                        <Badge
+                          variant={paid ? "default" : "secondary"}
+                          className={
+                            paid
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200 shadow-none px-3 py-1 text-xs font-semibold"
+                              : "bg-amber-50 text-amber-700 border-amber-200 shadow-none px-3 py-1 text-xs font-semibold"
+                          }
+                        >
+                          {paid ? "Paid" : "Unpaid"}
+                        </Badge>
 
-                  {order.status !== "PAID" && order.status !== "CANCELLED" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2.5 w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 h-7 text-xs font-semibold rounded-lg"
-                      onClick={async () => {
-                        if (confirm("Confirm payment received for this order?")) {
-                          await onUpdateStatus(order.id, "PAID");
-                        }
-                      }}
-                    >
-                      Mark as Paid
-                    </Button>
-                  )}
+                        {!paid && order.status !== "CANCELLED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2.5 w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 h-7 text-xs font-semibold rounded-lg"
+                            onClick={async () => {
+                              if (confirm("Confirm payment received for this order?")) {
+                                await onUpdateStatus(order.id, "PAID");
+                              }
+                            }}
+                          >
+                            Mark as Paid
+                          </Button>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 

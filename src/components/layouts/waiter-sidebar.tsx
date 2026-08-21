@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/components/providers/socket-provider";
 import {
   LayoutDashboard,
   ChefHat,
@@ -14,17 +16,77 @@ import {
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 
-const sidebarLinks = [
-  { title: "Floor Dashboard", href: "/waiter", icon: LayoutDashboard },
-  { title: "Dining Tables", href: "/waiter/tables", icon: Armchair },
-  { title: "Live Orders", href: "/waiter/orders", icon: Receipt },
-  { title: "Ready to Serve", href: "/waiter/ready", icon: ChefHat, badge: "Pass" },
-  { title: "Served Orders", href: "/waiter/served", icon: CheckCircle },
-  { title: "Order History", href: "/waiter/history", icon: History },
-];
-
 export default function WaiterSidebar({ restaurantName = "The Culinary Ledger" }: Readonly<{ restaurantName?: string }>) {
   const pathname = usePathname();
+  const { socket } = useSocket();
+  const [readyCount, setReadyCount] = useState<number>(0);
+
+  const fetchReadyCount = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/waiter/orders?status=READY&t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReadyCount(Array.isArray(data) ? data.length : 0);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function load() {
+      try {
+        const res = await fetch(`/api/waiter/orders?status=READY&t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) {
+            setReadyCount(Array.isArray(data) ? data.length : 0);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUpdate = () => {
+      void fetchReadyCount();
+    };
+
+    socket.on("order:ready", handleUpdate);
+    socket.on("order:served", handleUpdate);
+    socket.on("order:updated", handleUpdate);
+
+    return () => {
+      socket.off("order:ready", handleUpdate);
+      socket.off("order:served", handleUpdate);
+      socket.off("order:updated", handleUpdate);
+    };
+  }, [socket, fetchReadyCount]);
+
+  const sidebarLinks = [
+    { title: "Floor Dashboard", href: "/waiter", icon: LayoutDashboard },
+    { title: "Dining Tables", href: "/waiter/tables", icon: Armchair },
+    { title: "Live Orders", href: "/waiter/orders", icon: Receipt },
+    {
+      title: "Ready to Serve",
+      href: "/waiter/ready",
+      icon: ChefHat,
+      badge: readyCount > 0 ? `${readyCount} Ready` : "Pass",
+      highlight: readyCount > 0,
+    },
+    { title: "Served Orders", href: "/waiter/served", icon: CheckCircle },
+    { title: "Order History", href: "/waiter/history", icon: History },
+  ];
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-gray-200/80 bg-white hidden md:flex flex-col h-full transition-all duration-300 shadow-sm">
@@ -77,6 +139,8 @@ export default function WaiterSidebar({ restaurantName = "The Culinary Ledger" }
                       "text-[9px] font-bold px-1.5 py-0.2 rounded-full",
                       isActive
                         ? "bg-white/20 text-white"
+                        : link.highlight
+                        ? "bg-emerald-500 text-white animate-pulse"
                         : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                     )}
                   >
@@ -94,7 +158,7 @@ export default function WaiterSidebar({ restaurantName = "The Culinary Ledger" }
         <button
           type="button"
           onClick={() => logoutAction()}
-          className="w-full flex items-center justify-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-100"
+          className="w-full flex items-center justify-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all text-rose-600 hover:bg-rose-50 hover:text-rose-700 border border-rose-100 cursor-pointer"
         >
           <LogOut size={15} className="flex-shrink-0" />
           End Shift / Logout

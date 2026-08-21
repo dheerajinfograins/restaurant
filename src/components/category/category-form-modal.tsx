@@ -87,6 +87,7 @@ export function CategoryFormModal({
 
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageUrl = useWatch({ control: form.control, name: "image" });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -104,35 +105,61 @@ export function CategoryFormModal({
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files?.[0]) {
-      processFile(e.dataTransfer.files[0]);
+      void processFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
-      processFile(e.target.files[0]);
+      void processFile(e.target.files[0]);
     }
   };
 
-  const processFile = (file: File) => {
+  const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+      toast.error("Please upload an image file (PNG, JPG, WEBP, etc.)");
       return;
     }
-    // Limit to 2MB since it's converted to base64
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be less than 2MB");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image size must be less than 10MB");
       return;
     }
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        form.setValue("image", event.target.result as string);
+
+    setIsUploadingImage(true);
+    const toastId = toast.loading("Uploading image to Cloudinary...");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "categories");
+
+      const response = await axios.post("/api/upload?folder=categories", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const uploadedUrl = response.data?.data?.url;
+      if (uploadedUrl) {
+        form.setValue("image", uploadedUrl);
         setShowUrlInput(false);
+        toast.success("Image uploaded to Cloudinary!", { id: toastId });
+      } else {
+        toast.error("Upload succeeded but no image URL received", { id: toastId });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (error: unknown) {
+      console.error("Cloudinary upload failed:", error);
+      let errMsg = "Failed to upload image to Cloudinary";
+      if (axios.isAxiosError(error)) {
+        errMsg = error.response?.data?.message || errMsg;
+      }
+      toast.error(errMsg, { id: toastId });
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   async function onSubmit(data: FormValues) {
@@ -211,10 +238,10 @@ export function CategoryFormModal({
                           <div className="relative h-40 w-full border border-culinary-border rounded-xl overflow-hidden group">
                             <Image src={imageUrl} alt="Category Preview" fill sizes="(max-width: 768px) 100vw, 500px" className="object-cover" />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                              <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
-                                Change Image
+                              <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploadingImage}>
+                                {isUploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : "Change Image"}
                               </Button>
-                              <Button type="button" variant="destructive" size="sm" onClick={() => { form.setValue("image", ""); setShowUrlInput(false); }}>
+                              <Button type="button" variant="destructive" size="sm" onClick={() => { form.setValue("image", ""); setShowUrlInput(false); }} disabled={isUploadingImage}>
                                 Remove
                               </Button>
                             </div>
@@ -222,6 +249,7 @@ export function CategoryFormModal({
                         ) : (
                           <button
                             type="button"
+                            disabled={isUploadingImage}
                             onClick={() => fileInputRef.current?.click()}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
@@ -229,10 +257,18 @@ export function CategoryFormModal({
                             className={`w-full border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors cursor-pointer group shadow-sm ${isDragging ? "border-culinary-primary bg-culinary-primary/5" : "border-culinary-border bg-white hover:bg-white/50"}`}
                           >
                             <div className="w-12 h-12 rounded-full bg-culinary-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                              <UploadCloud className="text-culinary-primary" size={24} />
+                              {isUploadingImage ? (
+                                <Loader2 className="text-culinary-primary animate-spin" size={24} />
+                              ) : (
+                                <UploadCloud className="text-culinary-primary" size={24} />
+                              )}
                             </div>
-                            <p className="text-sm font-medium text-culinary-text">Upload Image</p>
-                            <p className="text-xs text-culinary-muted mt-1">Drag & Drop or Click to Browse</p>
+                            <p className="text-sm font-medium text-culinary-text">
+                              {isUploadingImage ? "Uploading to Cloudinary..." : "Upload Image"}
+                            </p>
+                            <p className="text-xs text-culinary-muted mt-1">
+                              {isUploadingImage ? "Please wait a moment" : "Drag & Drop or Click to Browse"}
+                            </p>
                           </button>
                         )}
 

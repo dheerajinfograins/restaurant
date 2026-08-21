@@ -66,8 +66,16 @@ export function DeleteCategoryDialog({
             </p>
             <div className="bg-red-50 text-red-800 p-3 rounded-md border border-red-100 flex items-center justify-between font-medium mt-2">
               <span>This category contains</span>
-              <span>0 Products</span>
+              <span>
+                {category?._count?.products ?? 0}{" "}
+                {(category?._count?.products ?? 0) === 1 ? "Product" : "Products"}
+              </span>
             </div>
+            {(category?._count?.products ?? 0) > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 p-2.5 rounded border border-amber-200 mt-2">
+                Note: Categories containing products linked to existing order history cannot be deleted. If you only want to hide it from the menu, edit the category and set its status to <strong>INACTIVE</strong> instead.
+              </p>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

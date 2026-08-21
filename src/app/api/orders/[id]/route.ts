@@ -37,6 +37,37 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { status, waiterId } = body;
+
+    const dataToUpdate: Record<string, unknown> = {};
+    if (status) dataToUpdate.status = status;
+    if (waiterId) dataToUpdate.waiterId = waiterId;
+
+    const order = await prisma.order.update({
+      where: { id },
+      data: dataToUpdate,
+      include: {
+        items: {
+          include: { product: true },
+        },
+        table: true,
+      },
+    });
+
+    return NextResponse.json(order);
+  } catch (error) {
+    console.error("Failed to update order:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -54,3 +85,4 @@ export async function DELETE(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

@@ -454,15 +454,15 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
           </div>
 
           <div>
-            {order.status === "PAID" || order.paymentMethod === "UPI" || order.paymentMethod === "CARD" ? (
+            {(order.status === "PAID" || order.notes?.includes("Razorpay Paid") || (order.paymentMethod && order.paymentMethod !== "CASH")) ? (
               <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 flex items-center gap-1 shadow-2xs">
                 <CheckCircle2 size={13} />
-                <span>Paid</span>
+                <span>Paid Online</span>
               </span>
             ) : (
               <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-800 rounded-full border border-amber-200 flex items-center gap-1 shadow-2xs">
                 <Clock size={13} />
-                <span>Pay at Table</span>
+                <span>Pay Cash to Server</span>
               </span>
             )}
           </div>
@@ -478,7 +478,7 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
               <span>Ordered Dishes ({order.items.length})</span>
             </h3>
             <span className="text-xs font-bold text-culinary-primary font-cormorant text-base">
-              ₹{order.totalAmount.toFixed(2)}
+              ₹{Number(order.totalAmount || 0).toFixed(2)}
             </span>
           </div>
 
@@ -494,7 +494,7 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
                   </span>
                 </div>
                 <span className="font-bold text-stone-900 text-xs sm:text-sm font-mono shrink-0">
-                  ₹{item.totalPrice.toFixed(2)}
+                  ₹{Number(item.totalPrice || 0).toFixed(2)}
                 </span>
               </div>
             ))}

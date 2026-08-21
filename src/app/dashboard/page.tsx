@@ -22,6 +22,7 @@ import {
   QrCode,
   Store,
   Check,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -447,10 +448,10 @@ export default function DashboardHome() {
       </div>
 
       {/* ===================== 2-COLUMN MAIN OPERATIONAL GRID ===================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
 
         {/* LEFT 2 COLS: RECENT LIVE ORDERS FEED */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col justify-between h-full">
           <div>
             <div className="p-5 border-b border-gray-100 flex items-center justify-between">
               <div>
@@ -476,7 +477,7 @@ export default function DashboardHome() {
 
             <div className="divide-y divide-gray-100">
               {data?.recentOrders?.length === 0 ? (
-                <div className="p-12 text-center text-gray-400 text-xs">
+                <div className="p-16 text-center text-gray-400 text-xs">
                   <ShoppingBag size={28} className="mx-auto mb-2 text-gray-300" />
                   No orders placed yet. Table QR orders will stream here live.
                 </div>
@@ -487,7 +488,7 @@ export default function DashboardHome() {
                     className="p-4 hover:bg-gray-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 text-culinary-primary font-bold text-sm flex items-center justify-center border border-amber-200 font-cormorant shrink-0 mt-0.5">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-100 to-amber-50 text-culinary-primary font-bold text-sm flex items-center justify-center border border-amber-200 font-cormorant shrink-0 mt-0.5 shadow-2xs">
                         T{order.tableNumber}
                       </div>
                       <div className="space-y-0.5">
@@ -531,81 +532,138 @@ export default function DashboardHome() {
         </div>
 
         {/* RIGHT 1 COL: SALES OVERVIEW CHART & POPULAR DISHES */}
-        <div className="space-y-6">
+        <div className="flex flex-col justify-between gap-6 h-full">
 
           {/* Weekly Sales Pattern Bar Chart */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div>
-                <h4 className="font-bold text-sm text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-culinary-primary" /> Weekly Sales Trend
-                </h4>
-                <p className="text-[11px] text-gray-400">Past 7 Days Revenue</p>
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-culinary-primary" /> Weekly Sales Trend
+                  </h4>
+                  <p className="text-[11px] text-gray-400">Past 7 Days Revenue Stream</p>
+                </div>
+                <span className="font-bold text-sm text-culinary-primary font-cormorant text-lg">
+                  ₹{totalWeeklyRev.toLocaleString()}
+                </span>
               </div>
-              <span className="font-bold text-sm text-culinary-primary font-cormorant text-base">
-                ₹{totalWeeklyRev.toLocaleString()}
-              </span>
+
+              {/* Taller Bars Container */}
+              <div className="mt-4 h-48 bg-gradient-to-b from-amber-50/50 via-amber-50/20 to-transparent rounded-2xl border border-amber-100/70 p-4 flex items-end justify-between gap-2.5">
+                {(data?.dayLabels || ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]).map((dayLabel, idx) => {
+                  const height = data?.weeklyChartData?.[idx] ?? [30, 50, 40, 70, 45, 90, 60][idx] ?? 0;
+                  const amount = data?.weeklyRevenue?.[idx] ?? 0;
+                  return (
+                    <div key={dayLabel} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
+                      <div className="w-full relative flex items-end justify-center h-34">
+                        {/* Tooltip */}
+                        <div className="absolute -top-8 bg-gray-900 text-white text-[10px] px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 shadow-lg font-mono font-bold">
+                          ₹{amount.toLocaleString()}
+                        </div>
+                        {/* Bar */}
+                        <div
+                          className="w-full max-w-[32px] bg-gradient-to-t from-amber-600 via-amber-500 to-amber-400 rounded-t-lg opacity-85 group-hover:opacity-100 transition-all cursor-pointer shadow-xs hover:shadow-md group-hover:scale-y-105 origin-bottom"
+                          style={{ height: `${Math.max(height, 10)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-500 uppercase">{dayLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {/* Bars */}
-            <div className="h-40 bg-gradient-to-b from-amber-50/40 to-transparent rounded-2xl border border-amber-100/60 p-4 flex items-end justify-between gap-2">
-              {(data?.dayLabels || ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]).map((dayLabel, idx) => {
-                const height = data?.weeklyChartData?.[idx] ?? [30, 50, 40, 70, 45, 90, 60][idx] ?? 0;
-                const amount = data?.weeklyRevenue?.[idx] ?? 0;
-                return (
-                  <div key={dayLabel} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
-                    <div className="w-full relative flex items-end justify-center h-28">
-                      {/* Tooltip */}
-                      <div className="absolute -top-7 bg-gray-900 text-white text-[10px] px-2 py-0.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20 shadow-md font-mono">
-                        ₹{amount}
-                      </div>
-                      {/* Bar */}
-                      <div
-                        className="w-full max-w-[28px] bg-gradient-to-t from-amber-600 to-amber-400 rounded-t-md opacity-85 group-hover:opacity-100 transition-all cursor-pointer shadow-sm"
-                        style={{ height: `${Math.max(height, 8)}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] font-bold text-gray-500 uppercase">{dayLabel}</span>
-                  </div>
-                );
-              })}
+            {/* Bottom Chart Stat Insight */}
+            <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span className="flex items-center gap-1">
+                <Sparkles size={12} className="text-amber-600" />
+                <span>Daily Avg: <strong className="text-gray-900">₹{(totalWeeklyRev / 7).toFixed(0)}</strong></span>
+              </span>
+              <span className="text-emerald-700 font-semibold">Active Trend</span>
             </div>
           </div>
 
           {/* Top Selling Dishes Leaderboard */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <h4 className="font-bold text-sm text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
-                <ChefHat size={14} className="text-culinary-primary" /> Top Selling Dishes
-              </h4>
-              <Link href="/dashboard/products" className="text-xs text-culinary-primary font-bold hover:underline">
-                Catalog
-              </Link>
+          <div className="bg-white rounded-2xl border border-gray-200/80 p-5 shadow-sm space-y-3.5 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div>
+                  <h4 className="font-bold text-sm text-gray-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <ChefHat size={14} className="text-culinary-primary" /> Top Selling Dishes
+                  </h4>
+                  <p className="text-[11px] text-gray-400">Best Performing Menu Items</p>
+                </div>
+                <Link href="/dashboard/products" className="text-xs text-culinary-primary font-bold hover:underline">
+                  Catalog →
+                </Link>
+              </div>
+
+              <div className="space-y-2.5 pt-2">
+                {(data?.topDishes?.length || 0) === 0 ? (
+                  <p className="text-xs text-gray-400 italic py-6 text-center">
+                    Top selling dishes will appear once table orders are completed.
+                  </p>
+                ) : (
+                  data?.topDishes?.slice(0, 5).map((dish, idx: number) => {
+                    const topRevenue = data?.topDishes?.[0]?.revenue || 1;
+                    const share = (dish.revenue / topRevenue) * 100;
+                    const isTopThree = idx < 3;
+
+                    return (
+                      <div
+                        key={dish.id}
+                        className="p-2.5 bg-gray-50/70 hover:bg-amber-50/40 rounded-xl border border-gray-100 transition-all flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center shrink-0 border ${
+                              idx === 0
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : idx === 1
+                                ? "bg-slate-200 text-slate-800 border-slate-300"
+                                : idx === 2
+                                ? "bg-amber-700/10 text-amber-900 border-amber-600/30"
+                                : "bg-white text-gray-600 border-gray-200"
+                            }`}
+                          >
+                            {isTopThree ? (idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉") : idx + 1}
+                          </span>
+                          <div className="truncate">
+                            <p className="font-bold text-gray-900 truncate" title={dish.name}>
+                              {dish.name}
+                            </p>
+                            <p className="text-[10px] text-gray-400">
+                              {dish.totalSold} Orders Sold
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="font-bold text-gray-900 block font-mono text-xs">
+                            ₹{dish.revenue.toFixed(0)}
+                          </span>
+                          <div className="w-16 h-1 bg-gray-200 rounded-full mt-1 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full"
+                              style={{ width: `${Math.max(10, share)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {(data?.topDishes?.length || 0) === 0 ? (
-                <p className="text-xs text-gray-400 italic py-4 text-center">
-                  Top selling dishes will appear once table orders are completed.
-                </p>
-              ) : (
-                data?.topDishes?.map((dish, idx: number) => (
-                  <div key={dish.id} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-5 h-5 rounded-full bg-amber-50 text-culinary-primary font-bold text-[10px] flex items-center justify-center shrink-0 border border-amber-200">
-                        {idx + 1}
-                      </span>
-                      <div className="truncate">
-                        <p className="font-bold text-gray-900 truncate" title={dish.name}>{dish.name}</p>
-                        <p className="text-[10px] text-gray-400">{dish.totalSold} Orders Sold</p>
-                      </div>
-                    </div>
-                    <span className="font-bold text-gray-800 shrink-0 font-mono">
-                      ₹{dish.revenue.toFixed(0)}
-                    </span>
-                  </div>
-                ))
-              )}
+            {/* Bottom Dish Stat Footer */}
+            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
+              <span>Menu Popularity Metrics</span>
+              <Link href="/dashboard/products" className="text-culinary-primary font-bold hover:underline flex items-center gap-1">
+                <span>View Products</span>
+                <ArrowRight size={11} />
+              </Link>
             </div>
           </div>
 

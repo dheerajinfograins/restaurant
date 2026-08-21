@@ -1,28 +1,12 @@
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
-import { verifyAccessToken } from "@/lib/jwt";
+import { getAuthenticatedRestaurantId } from "@/lib/permissions";
 import { productController } from "@/modules/product";
 import { handleError } from "@/helpers/error-handler";
-import { AppError, HTTP_STATUS } from "@/exceptions";
 import { ProductFilters } from "@/modules/product/repository";
-
-async function getRestaurantId() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
-  if (!token) throw new AppError("Unauthorized", HTTP_STATUS.UNAUTHORIZED);
-  
-  const payload = verifyAccessToken(token);
-  
-  if (!payload.restaurantId && payload.role !== "SUPER_ADMIN") {
-    throw new AppError("No restaurant associated with this user", HTTP_STATUS.FORBIDDEN);
-  }
-  
-  return payload.restaurantId || "super-admin-restaurant";
-}
 
 export async function GET(request: NextRequest) {
   try {
-    const restaurantId = await getRestaurantId();
+    const restaurantId = await getAuthenticatedRestaurantId();
     
     // Extract filters from URL search params
     const searchParams = request.nextUrl.searchParams;
@@ -47,7 +31,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const restaurantId = await getRestaurantId();
+    const restaurantId = await getAuthenticatedRestaurantId();
     const body = await request.json();
     return await productController.createProduct(restaurantId, body);
   } catch (error) {

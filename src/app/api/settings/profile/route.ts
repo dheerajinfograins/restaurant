@@ -4,6 +4,7 @@ import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
 import { requireRoles } from "@/lib/permissions";
 import { AppError, HTTP_STATUS } from "@/exceptions";
+import { deleteImageFromCloudinary, uploadImageToCloudinary } from "@/lib/cloudinary";
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -13,10 +14,32 @@ export async function PATCH(request: NextRequest) {
       throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
     }
 
+    const currentRestaurant = await prisma.restaurant.findUnique({
+      where: { id: payload.restaurantId }
+    });
+
+    if (!currentRestaurant) {
+      throw new AppError("Restaurant not found", HTTP_STATUS.NOT_FOUND);
+    }
+
     const body = await request.json();
     
     // Whitelist allowed fields to update on Restaurant
     const { name, phone, email, address, city, state, pincode, website, logo } = body;
+
+    let finalLogo = logo;
+    if (finalLogo?.startsWith("data:image")) {
+      try {
+        const uploadRes = await uploadImageToCloudinary(finalLogo, "restaurant/logos");
+        finalLogo = uploadRes.url;
+      } catch (err) {
+        console.error("Failed to upload restaurant logo to Cloudinary:", err);
+      }
+    }
+
+    if (logo !== undefined && currentRestaurant.logo && currentRestaurant.logo !== finalLogo && currentRestaurant.logo.includes("res.cloudinary.com")) {
+      void deleteImageFromCloudinary(currentRestaurant.logo);
+    }
 
     const updatedRestaurant = await prisma.restaurant.update({
       where: { id: payload.restaurantId },
@@ -29,7 +52,7 @@ export async function PATCH(request: NextRequest) {
         state,
         pincode,
         website,
-        logo
+        logo: finalLogo !== undefined ? finalLogo : currentRestaurant.logo,
       }
     });
 

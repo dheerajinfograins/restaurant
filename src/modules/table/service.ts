@@ -2,6 +2,7 @@ import tableRepository from "./repository";
 import { CreateTableDTO, UpdateTableDTO } from "./dto";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { TABLE_MESSAGES } from "./constants";
+import { prisma } from "@/lib/prisma";
 
 class TableService {
   async getTables(restaurantId: string) {
@@ -49,6 +50,20 @@ class TableService {
 
   async deleteTable(id: string, restaurantId: string) {
     await this.getTableById(id, restaurantId);
+
+    const ordersCount = await prisma.order.count({
+      where: {
+        tableId: id,
+      },
+    });
+
+    if (ordersCount > 0) {
+      throw new AppError(
+        "Cannot delete table because it has associated order records.",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
     return tableRepository.delete(id);
   }
 }

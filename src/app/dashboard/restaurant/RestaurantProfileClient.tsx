@@ -3,27 +3,26 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { 
-  Building2, 
-  MapPin, 
-  Phone, 
-  Mail, 
-  Globe, 
-  Sparkles, 
-  CheckCircle2, 
-  Store, 
-  ExternalLink, 
-  Save, 
-  RotateCcw, 
-  QrCode, 
-  UtensilsCrossed, 
+import {
+  MapPin,
+  Phone,
+  Mail,
+  Globe,
+  Store,
+  ExternalLink,
+  Save,
+  RotateCcw,
+  QrCode,
+  UtensilsCrossed,
   Users,
   BarChart3,
   Image as ImageIcon,
   Check,
-  CheckCircle,
-  Clock,
-  Layers
+  Layers,
+  UploadCloud,
+  Loader2,
+  Trash2,
+  Camera
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +31,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import Image from "next/image";
+
+const isConfiguredRemoteDomain = (url?: string | null) => {
+  if (!url) return false;
+  return url.startsWith("https://images.unsplash.com") || url.startsWith("https://res.cloudinary.com");
+};
 
 const PRESET_COVERS = [
   {
@@ -52,58 +57,415 @@ const PRESET_COVERS = [
   },
 ];
 
+const HUB_NAVIGATION_LINKS = [
+  {
+    href: "/dashboard/tables",
+    title: "Dining Tables & QR Codes",
+    icon: UtensilsCrossed,
+  },
+  {
+    href: "/dashboard/products",
+    title: "Menu & Dishes Catalog",
+    icon: Store,
+  },
+  {
+    href: "/dashboard/staff",
+    title: "Staff Team & Roles",
+    icon: Users,
+  },
+  {
+    href: "/dashboard/reports",
+    title: "Financial Reports & Analytics",
+    icon: BarChart3,
+  },
+];
+
+interface RestaurantProfileFormData {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+  website: string;
+  description: string;
+  logo: string;
+  coverImage: string;
+  isActive: boolean;
+}
+
+const DEFAULT_FORM_DATA: RestaurantProfileFormData = {
+  name: "",
+  phone: "",
+  email: "",
+  address: "",
+  city: "",
+  state: "",
+  country: "India",
+  pincode: "",
+  website: "",
+  description: "",
+  logo: "",
+  coverImage: PRESET_COVERS[0].url,
+  isActive: true,
+};
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error) && error.response?.data?.message) {
+    return error.response.data.message;
+  }
+  return fallback;
+}
+
+interface RestaurantProfileResponse {
+  name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  website?: string;
+  description?: string;
+  logo?: string;
+  coverImage?: string;
+  isActive?: boolean;
+}
+
+function mapProfileToFormData(profile?: RestaurantProfileResponse | null): RestaurantProfileFormData {
+  if (!profile) return DEFAULT_FORM_DATA;
+  return {
+    name: profile.name || "",
+    phone: profile.phone || "",
+    email: profile.email || "",
+    address: profile.address || "",
+    city: profile.city || "",
+    state: profile.state || "",
+    country: profile.country || "India",
+    pincode: profile.pincode || "",
+    website: profile.website || "",
+    description: profile.description || "",
+    logo: profile.logo || "",
+    coverImage: profile.coverImage || PRESET_COVERS[0].url,
+    isActive: profile.isActive ?? true,
+  };
+}
+
+async function uploadImageFile(
+  file: File,
+  folder: "restaurant/logos" | "restaurant/covers"
+): Promise<string | null> {
+  if (!file.type.startsWith("image/")) {
+    toast.error("Please select a valid image file (PNG, JPG, WEBP)");
+    return null;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    toast.error("Image size must be less than 10MB");
+    return null;
+  }
+
+  const toastId = toast.loading("Uploading to Cloudinary...");
+  try {
+    const formPayload = new FormData();
+    formPayload.append("file", file);
+    formPayload.append("folder", folder);
+
+    const res = await axios.post(`/api/upload?folder=${folder}`, formPayload, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    const uploadedUrl = res.data?.data?.url;
+    if (uploadedUrl) {
+      toast.success("Uploaded to Cloudinary successfully!", { id: toastId });
+      return uploadedUrl;
+    }
+    toast.error("Upload failed: No URL returned", { id: toastId });
+    return null;
+  } catch (error) {
+    console.error("Cloudinary upload failed:", error);
+    toast.error(getErrorMessage(error, "Failed to upload image to Cloudinary"), { id: toastId });
+    return null;
+  }
+}
+
+function LoadingState() {
+  return (
+    <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm">
+      <div className="animate-spin rounded-full h-8 w-8 border-2 border-culinary-primary border-t-transparent" />
+      <p className="text-sm font-semibold text-gray-500">Loading restaurant profile & branding...</p>
+    </div>
+  );
+}
+
+interface HeroBannerProps {
+  readonly formData: RestaurantProfileFormData;
+  readonly coverUrl: string;
+  readonly initial: string;
+  readonly onToggleActive: (val: boolean) => void;
+}
+
+function RestaurantHeroBanner({ formData, coverUrl, initial, onToggleActive }: Readonly<HeroBannerProps>) {
+  return (
+    <div className="relative rounded-3xl overflow-hidden border border-gray-200/90 shadow-sm bg-gray-950">
+      {/* Cover Image Backdrop */}
+      <div className="h-44 md:h-52 w-full relative">
+        <Image
+          src={coverUrl}
+          alt="Restaurant Cover"
+          fill
+          priority
+          sizes="(max-width: 768px) 100vw, 1200px"
+          unoptimized={!isConfiguredRemoteDomain(coverUrl)}
+          className="object-cover opacity-60 filter brightness-90 transition-all duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent" />
+      </div>
+
+      {/* Hero Overlay Content */}
+      <div className="absolute bottom-0 inset-x-0 p-5 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div className="flex items-center md:items-end gap-4">
+          {/* Logo Monogram */}
+          <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 text-white font-bold text-2xl md:text-3xl flex items-center justify-center shadow-2xl border-2 border-white/80 shrink-0 font-cormorant relative overflow-hidden">
+            {formData.logo ? (
+              <Image
+                src={formData.logo}
+                alt="Logo"
+                fill
+                sizes="80px"
+                unoptimized={!isConfiguredRemoteDomain(formData.logo)}
+                className="object-cover rounded-2xl"
+              />
+            ) : (
+              initial
+            )}
+          </div>
+
+          {/* Restaurant Meta */}
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl md:text-2xl font-bold text-white font-cormorant tracking-tight">
+                {formData.name || "Restaurant Name"}
+              </h2>
+              <Badge
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  formData.isActive
+                    ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
+                    : "bg-rose-500/20 text-rose-300 border-rose-400/40"
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                    formData.isActive ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
+                  }`}
+                />
+                {formData.isActive ? "OPEN FOR DINING" : "CURRENTLY CLOSED"}
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-gray-300 flex-wrap">
+              {formData.city && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={12} className="text-amber-400" />
+                  {formData.city}, {formData.state || formData.country}
+                </span>
+              )}
+              {formData.phone && (
+                <span className="flex items-center gap-1">
+                  <Phone size={12} className="text-amber-400" />
+                  {formData.phone}
+                </span>
+              )}
+              <span className="text-amber-400/80 font-bold">• Currency: ₹ INR</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Toggle Live Dining Service */}
+        <div className="flex items-center gap-3 bg-gray-900/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-gray-700/80 text-xs">
+          <div className="text-right">
+            <p className="font-bold text-white text-xs">Accepting Orders</p>
+            <p className="text-[10px] text-gray-400">Live Customer Dining</p>
+          </div>
+          <Switch
+            checked={formData.isActive}
+            onCheckedChange={onToggleActive}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface PreviewCardProps {
+  readonly formData: RestaurantProfileFormData;
+  readonly coverUrl: string;
+  readonly initial: string;
+}
+
+function LiveCustomerPreviewCard({ formData, coverUrl, initial }: Readonly<PreviewCardProps>) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 space-y-4">
+      <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+          <Store size={13} className="text-culinary-primary" /> Live Customer Card
+        </span>
+        <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+          Live Preview
+        </span>
+      </div>
+
+      {/* Mock Mobile View Card */}
+      <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm bg-white">
+        <div className="h-28 w-full relative bg-gray-900">
+          <Image
+            src={coverUrl}
+            alt="Customer Preview"
+            fill
+            sizes="(max-width: 768px) 100vw, 400px"
+            unoptimized={!isConfiguredRemoteDomain(coverUrl)}
+            className="object-cover opacity-80 transition-all duration-300"
+          />
+          <div className="absolute top-2.5 right-2.5">
+            <Badge
+              className={`text-[10px] font-bold ${
+                formData.isActive
+                  ? "bg-emerald-600 text-white border-none"
+                  : "bg-rose-600 text-white border-none"
+              }`}
+            >
+              {formData.isActive ? "OPEN" : "CLOSED"}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-xl bg-culinary-primary text-white font-bold text-lg flex items-center justify-center shrink-0 font-cormorant">
+              {initial}
+            </div>
+            <div className="min-w-0">
+              <h4 className="font-bold text-sm text-gray-900 truncate font-cormorant text-base">
+                {formData.name || "Restaurant Name"}
+              </h4>
+              <p className="text-[11px] text-gray-500 truncate">
+                {formData.city || "City"}, {formData.country || "India"}
+              </p>
+            </div>
+          </div>
+
+          {formData.description && (
+            <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed bg-gray-50 p-2 rounded-lg">
+              {formData.description}
+            </p>
+          )}
+
+          <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600">
+            <span className="flex items-center gap-1 text-[11px]">
+              <Phone size={11} className="text-culinary-primary" />
+              {formData.phone || "No phone"}
+            </span>
+            <span className="text-[11px] font-bold text-culinary-primary">
+              Currency: ₹ INR
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Digital Menu Preview Button */}
+      <Link
+        href="/"
+        target="_blank"
+        className="flex items-center justify-center gap-2 w-full py-2.5 bg-amber-50 hover:bg-amber-100/80 text-culinary-primary rounded-xl text-xs font-bold border border-amber-200/80 transition-colors"
+      >
+        <QrCode size={14} /> Open Customer Digital Menu <ExternalLink size={12} />
+      </Link>
+    </div>
+  );
+}
+
+function RestaurantHubNavigation() {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 space-y-3">
+      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
+        <Layers size={14} className="text-culinary-primary" /> Restaurant Management Hub
+      </h4>
+
+      <div className="space-y-2 pt-1">
+        {HUB_NAVIGATION_LINKS.map((link) => {
+          const Icon = link.icon;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-amber-50 hover:text-culinary-primary transition-colors text-xs font-semibold text-gray-700 border border-gray-100 group"
+            >
+              <div className="flex items-center gap-2.5">
+                <Icon size={15} className="text-gray-400 group-hover:text-culinary-primary" />
+                <span>{link.title}</span>
+              </div>
+              <ExternalLink size={13} className="text-gray-400" />
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function RestaurantProfileClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
 
-  const [initialData, setInitialData] = useState<any>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    address: "",
-    city: "",
-    state: "",
-    country: "",
-    pincode: "",
-    website: "",
-    description: "",
-    logo: "",
-    coverImage: "",
-    isActive: true,
-  });
+  const [initialData, setInitialData] = useState<RestaurantProfileFormData | null>(null);
+  const [formData, setFormData] = useState<RestaurantProfileFormData>(DEFAULT_FORM_DATA);
 
-  const fetchProfile = async () => {
-    try {
-      const { data } = await axios.get("/api/restaurant");
-      const profile = data.data;
-      const loaded = {
-        name: profile.name || "",
-        phone: profile.phone || "",
-        email: profile.email || "",
-        address: profile.address || "",
-        city: profile.city || "",
-        state: profile.state || "",
-        country: profile.country || "India",
-        pincode: profile.pincode || "",
-        website: profile.website || "",
-        description: profile.description || "",
-        logo: profile.logo || "",
-        coverImage: profile.coverImage || PRESET_COVERS[0].url,
-        isActive: profile.isActive ?? true,
-      };
-      setFormData(loaded);
-      setInitialData(loaded);
-    } catch (error) {
-      console.error("Error loading restaurant profile:", error);
-      toast.error("Failed to load restaurant profile");
-    } finally {
-      setLoading(false);
+  const handleUpload = async (
+    file: File,
+    folder: "restaurant/logos" | "restaurant/covers",
+    setUploading: (val: boolean) => void,
+    field: "logo" | "coverImage"
+  ) => {
+    setUploading(true);
+    const url = await uploadImageFile(file, folder);
+    setUploading(false);
+    if (url) {
+      setFormData((prev) => ({ ...prev, [field]: url }));
     }
   };
 
   useEffect(() => {
-    void fetchProfile();
+    let isMounted = true;
+
+    async function loadProfile() {
+      try {
+        const { data } = await axios.get("/api/restaurant");
+        if (isMounted) {
+          const loaded = mapProfileToFormData(data.data);
+          setFormData(loaded);
+          setInitialData(loaded);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error loading restaurant profile:", error);
+          toast.error("Failed to load restaurant profile");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSave = async () => {
@@ -117,8 +479,8 @@ export default function RestaurantProfileClient() {
       await axios.patch("/api/restaurant", formData);
       toast.success("Restaurant profile saved successfully!");
       setInitialData(formData);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to save profile");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to save profile"));
     } finally {
       setSaving(false);
     }
@@ -132,12 +494,7 @@ export default function RestaurantProfileClient() {
   };
 
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-culinary-primary border-t-transparent"></div>
-        <p className="text-sm font-semibold text-gray-500">Loading restaurant profile & branding...</p>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   const coverUrl = formData.coverImage || PRESET_COVERS[0].url;
@@ -145,95 +502,18 @@ export default function RestaurantProfileClient() {
 
   return (
     <div className="space-y-6 font-sans pb-16">
-      
       {/* ===================== HERO BRAND BANNER ===================== */}
-      <div className="relative rounded-3xl overflow-hidden border border-gray-200/90 shadow-sm bg-gray-950">
-        {/* Cover Image Backdrop */}
-        <div className="h-44 md:h-52 w-full relative">
-          <img
-            src={coverUrl}
-            alt="Restaurant Cover"
-            className="w-full h-full object-cover opacity-60 filter brightness-90 transition-all duration-500"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/60 to-transparent" />
-        </div>
-
-        {/* Hero Overlay Content */}
-        <div className="absolute bottom-0 inset-x-0 p-5 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-          <div className="flex items-center md:items-end gap-4">
-            {/* Logo Monogram */}
-            <div className="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-br from-amber-500 via-amber-600 to-amber-700 text-white font-bold text-2xl md:text-3xl flex items-center justify-center shadow-2xl border-2 border-white/80 shrink-0 font-cormorant">
-              {formData.logo ? (
-                <img
-                  src={formData.logo}
-                  alt="Logo"
-                  className="w-full h-full object-cover rounded-2xl"
-                />
-              ) : (
-                initial
-              )}
-            </div>
-
-            {/* Restaurant Meta */}
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl md:text-2xl font-bold text-white font-cormorant tracking-tight">
-                  {formData.name || "Restaurant Name"}
-                </h2>
-                <Badge
-                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                    formData.isActive
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
-                      : "bg-rose-500/20 text-rose-300 border-rose-400/40"
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                      formData.isActive ? "bg-emerald-400 animate-pulse" : "bg-rose-400"
-                    }`}
-                  ></span>
-                  {formData.isActive ? "OPEN FOR DINING" : "CURRENTLY CLOSED"}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs text-gray-300 flex-wrap">
-                {formData.city && (
-                  <span className="flex items-center gap-1">
-                    <MapPin size={12} className="text-amber-400" />
-                    {formData.city}, {formData.state || formData.country}
-                  </span>
-                )}
-                {formData.phone && (
-                  <span className="flex items-center gap-1">
-                    <Phone size={12} className="text-amber-400" />
-                    {formData.phone}
-                  </span>
-                )}
-                <span className="text-amber-400/80 font-bold">• Currency: ₹ INR</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Toggle Live Dining Service */}
-          <div className="flex items-center gap-3 bg-gray-900/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-gray-700/80 text-xs">
-            <div className="text-right">
-              <p className="font-bold text-white text-xs">Accepting Orders</p>
-              <p className="text-[10px] text-gray-400">Live Customer Dining</p>
-            </div>
-            <Switch
-              checked={formData.isActive}
-              onCheckedChange={(val) => setFormData((prev) => ({ ...prev, isActive: val }))}
-            />
-          </div>
-        </div>
-      </div>
+      <RestaurantHeroBanner
+        formData={formData}
+        coverUrl={coverUrl}
+        initial={initial}
+        onToggleActive={(val) => setFormData((prev) => ({ ...prev, isActive: val }))}
+      />
 
       {/* ===================== UNIFIED 2-COLUMN WORKSPACE ===================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        
         {/* LEFT COLUMN: Complete Configuration Form (2/3 width) */}
         <div className="lg:col-span-2 space-y-6">
-          
           {/* SECTION 1: Brand & Concept Story */}
           <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100">
@@ -292,16 +572,18 @@ export default function RestaurantProfileClient() {
                             : "border-gray-200 hover:border-gray-400"
                         }`}
                       >
-                        <img
+                        <Image
                           src={preset.url}
                           alt={preset.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          fill
+                          sizes="(max-width: 640px) 50vw, 25vw"
+                          className="object-cover group-hover:scale-105 transition-transform"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent flex items-end p-1.5">
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/80 via-transparent to-transparent flex items-end p-1.5 z-10">
                           <span className="text-[10px] font-bold text-white truncate">{preset.name}</span>
                         </div>
                         {isSelected && (
-                          <div className="absolute top-1.5 right-1.5 bg-culinary-primary text-white rounded-full p-0.5 shadow-md">
+                          <div className="absolute top-1.5 right-1.5 bg-culinary-primary text-white rounded-full p-0.5 shadow-md z-10">
                             <Check size={10} />
                           </div>
                         )}
@@ -311,25 +593,168 @@ export default function RestaurantProfileClient() {
                 </div>
               </div>
 
-              {/* Custom Image Links */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-gray-700">Logo Image URL</Label>
-                  <Input
-                    value={formData.logo}
-                    onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
-                    placeholder="https://.../logo.png"
-                    className="rounded-xl border-gray-200 text-xs"
-                  />
+              {/* Custom Image Uploads & Cloudinary Sync */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                {/* Logo Uploader */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <Camera size={14} className="text-culinary-primary" /> Official Brand Logo
+                    </Label>
+                    {formData.logo && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, logo: "" }))}
+                        className="text-[10px] text-rose-500 hover:underline flex items-center gap-1"
+                      >
+                        <Trash2 size={10} /> Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 overflow-hidden relative">
+                      {formData.logo ? (
+                        <Image
+                          src={formData.logo}
+                          alt="Logo preview"
+                          fill
+                          sizes="56px"
+                          unoptimized={!isConfiguredRemoteDomain(formData.logo)}
+                          className="object-cover"
+                        />
+                      ) : (
+                        <span className="font-cormorant text-xl font-bold text-culinary-primary">
+                          {initial}
+                        </span>
+                      )}
+                      {uploadingLogo && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                          <Loader2 size={16} className="text-white animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-1">
+                      <input
+                        type="file"
+                        id="restaurant-logo-input"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            void handleUpload(file, "restaurant/logos", setUploadingLogo, "logo");
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadingLogo}
+                        onClick={() => document.getElementById("restaurant-logo-input")?.click()}
+                        className="w-full text-xs h-8 border-gray-200 hover:bg-amber-50/50 hover:border-amber-300 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        {uploadingLogo ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin text-culinary-primary" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud size={13} className="text-culinary-primary" />
+                            <span>{formData.logo ? "Change Logo (Cloudinary)" : "Upload Logo (Cloudinary)"}</span>
+                          </>
+                        )}
+                      </Button>
+                      <Input
+                        value={formData.logo}
+                        onChange={(e) => setFormData({ ...formData, logo: e.target.value })}
+                        placeholder="Or enter logo image URL"
+                        className="rounded-xl border-gray-200 text-[11px] h-7 px-2"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-gray-700">Custom Cover Image URL</Label>
-                  <Input
-                    value={formData.coverImage}
-                    onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
-                    placeholder="https://.../banner.jpg"
-                    className="rounded-xl border-gray-200 text-xs"
-                  />
+
+                {/* Custom Cover Uploader */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                      <ImageIcon size={14} className="text-culinary-primary" /> Custom Cover Banner
+                    </Label>
+                    {formData.coverImage && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, coverImage: PRESET_COVERS[0].url }))}
+                        className="text-[10px] text-gray-400 hover:underline"
+                      >
+                        Reset Preset
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden relative">
+                      <Image
+                        src={formData.coverImage || PRESET_COVERS[0].url}
+                        alt="Cover preview"
+                        fill
+                        sizes="56px"
+                        unoptimized={!isConfiguredRemoteDomain(formData.coverImage || PRESET_COVERS[0].url)}
+                        className="object-cover"
+                      />
+                      {uploadingCover && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+                          <Loader2 size={16} className="text-white animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-1">
+                      <input
+                        type="file"
+                        id="restaurant-cover-input"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            void handleUpload(file, "restaurant/covers", setUploadingCover, "coverImage");
+                            e.target.value = "";
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadingCover}
+                        onClick={() => document.getElementById("restaurant-cover-input")?.click()}
+                        className="w-full text-xs h-8 border-gray-200 hover:bg-amber-50/50 hover:border-amber-300 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        {uploadingCover ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin text-culinary-primary" />
+                            <span>Uploading...</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadCloud size={13} className="text-culinary-primary" />
+                            <span>Upload Banner (Cloudinary)</span>
+                          </>
+                        )}
+                      </Button>
+                      <Input
+                        value={formData.coverImage}
+                        onChange={(e) => setFormData({ ...formData, coverImage: e.target.value })}
+                        placeholder="Or enter banner image URL"
+                        className="rounded-xl border-gray-200 text-[11px] h-7 px-2"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -491,134 +916,12 @@ export default function RestaurantProfileClient() {
 
         {/* RIGHT COLUMN: Live Customer Preview Card & Hub Shortcuts (1/3 width) */}
         <div className="space-y-6 lg:sticky lg:top-6">
-          
-          {/* Live Customer Preview Card */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 space-y-4">
-            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Store size={13} className="text-culinary-primary" /> Live Customer Card
-              </span>
-              <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                Live Preview
-              </span>
-            </div>
-
-            {/* Mock Mobile View Card */}
-            <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm bg-white">
-              <div className="h-28 w-full relative bg-gray-900">
-                <img
-                  src={coverUrl}
-                  alt="Customer Preview"
-                  className="w-full h-full object-cover opacity-80 transition-all duration-300"
-                />
-                <div className="absolute top-2.5 right-2.5">
-                  <Badge
-                    className={`text-[10px] font-bold ${
-                      formData.isActive
-                        ? "bg-emerald-600 text-white border-none"
-                        : "bg-rose-600 text-white border-none"
-                    }`}
-                  >
-                    {formData.isActive ? "OPEN" : "CLOSED"}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="p-4 space-y-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-culinary-primary text-white font-bold text-lg flex items-center justify-center shrink-0 font-cormorant">
-                    {initial}
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="font-bold text-sm text-gray-900 truncate font-cormorant text-base">
-                      {formData.name || "Restaurant Name"}
-                    </h4>
-                    <p className="text-[11px] text-gray-500 truncate">
-                      {formData.city || "City"}, {formData.country || "India"}
-                    </p>
-                  </div>
-                </div>
-
-                {formData.description && (
-                  <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed bg-gray-50 p-2 rounded-lg">
-                    {formData.description}
-                  </p>
-                )}
-
-                <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs text-gray-600">
-                  <span className="flex items-center gap-1 text-[11px]">
-                    <Phone size={11} className="text-culinary-primary" />
-                    {formData.phone || "No phone"}
-                  </span>
-                  <span className="text-[11px] font-bold text-culinary-primary">
-                    Currency: ₹ INR
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick Digital Menu Preview Button */}
-            <Link
-              href="/"
-              target="_blank"
-              className="flex items-center justify-center gap-2 w-full py-2.5 bg-amber-50 hover:bg-amber-100/80 text-culinary-primary rounded-xl text-xs font-bold border border-amber-200/80 transition-colors"
-            >
-              <QrCode size={14} /> Open Customer Digital Menu <ExternalLink size={12} />
-            </Link>
-          </div>
-
-          {/* Quick Hub Navigation Shortcuts */}
-          <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 space-y-3">
-            <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <Layers size={14} className="text-culinary-primary" /> Restaurant Management Hub
-            </h4>
-
-            <div className="space-y-2 pt-1">
-              <Link
-                href="/dashboard/tables"
-                className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-amber-50 hover:text-culinary-primary transition-colors text-xs font-semibold text-gray-700 border border-gray-100 group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <UtensilsCrossed size={15} className="text-gray-400 group-hover:text-culinary-primary" />
-                  <span>Dining Tables & QR Codes</span>
-                </div>
-                <ExternalLink size={13} className="text-gray-400" />
-              </Link>
-
-              <Link
-                href="/dashboard/products"
-                className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-amber-50 hover:text-culinary-primary transition-colors text-xs font-semibold text-gray-700 border border-gray-100 group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Store size={15} className="text-gray-400 group-hover:text-culinary-primary" />
-                  <span>Menu & Dishes Catalog</span>
-                </div>
-                <ExternalLink size={13} className="text-gray-400" />
-              </Link>
-
-              <Link
-                href="/dashboard/staff"
-                className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-amber-50 hover:text-culinary-primary transition-colors text-xs font-semibold text-gray-700 border border-gray-100 group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Users size={15} className="text-gray-400 group-hover:text-culinary-primary" />
-                  <span>Staff Team & Roles</span>
-                </div>
-                <ExternalLink size={13} className="text-gray-400" />
-              </Link>
-
-              <Link
-                href="/dashboard/reports"
-                className="flex items-center justify-between p-3 rounded-xl bg-gray-50/80 hover:bg-amber-50 hover:text-culinary-primary transition-colors text-xs font-semibold text-gray-700 border border-gray-100 group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <BarChart3 size={15} className="text-gray-400 group-hover:text-culinary-primary" />
-                  <span>Financial Reports & Analytics</span>
-                </div>
-                <ExternalLink size={13} className="text-gray-400" />
-              </Link>
-            </div>
-          </div>
+          <LiveCustomerPreviewCard
+            formData={formData}
+            coverUrl={coverUrl}
+            initial={initial}
+          />
+          <RestaurantHubNavigation />
         </div>
       </div>
     </div>

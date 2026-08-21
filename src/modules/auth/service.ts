@@ -30,6 +30,18 @@ class AuthService {
             );
         }
 
+        if (user.isActive === false) {
+            throw new AppError(
+                "Your account has been deactivated. Please contact your restaurant administrator.",
+                HTTP_STATUS.FORBIDDEN
+            );
+        }
+
+        // Update lastLoginAt timestamp
+        await authRepository.updateUser(user.id, {
+            lastLoginAt: new Date(),
+        });
+
         const accessToken = generateAccessToken({
             id: user.id,
             email: user.email,
@@ -38,7 +50,10 @@ class AuthService {
         });
 
         return {
-            user,
+            user: {
+                ...user,
+                lastLoginAt: new Date(),
+            },
             accessToken,
         };
     }

@@ -12,14 +12,12 @@ import {
   PieChart,
   Pie,
   Legend,
-  Cell,
 } from "recharts";
 import {
   Printer,
   FileSpreadsheet,
   TrendingUp,
   ShoppingBag,
-  CheckCircle,
   IndianRupee,
   RotateCw,
   Clock,
@@ -28,16 +26,24 @@ import {
   CreditCard,
   Utensils,
   Award,
-  Calendar,
   Layers,
   Sparkles,
+  Eye,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { io } from "socket.io-client";
+import { AllTablesTurnoverModal } from "@/components/dashboard/reports/AllTablesTurnoverModal";
+import { io, Socket } from "socket.io-client";
 
 const CHART_COLORS = ["#d4af37", "#0ea5e9", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6"];
+
+function getProductRankBadgeStyle(idx: number): string {
+  if (idx === 0) return "bg-amber-100 text-amber-800";
+  if (idx === 1) return "bg-gray-200 text-gray-700";
+  if (idx === 2) return "bg-amber-50 text-amber-700";
+  return "bg-gray-100 text-gray-500";
+}
 
 export interface ReportPayload {
   kpis: {
@@ -72,9 +78,9 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
   const [range, setRange] = useState<string>("last7");
   const [isLoading, setIsLoading] = useState(!initialData);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAllTablesModalOpen, setIsAllTablesModalOpen] = useState(false);
 
-  const fetchReports = useCallback(async (selectedRange = range, showIndicator = false) => {
-    if (showIndicator) setIsRefreshing(true);
+  const fetchReports = useCallback(async (selectedRange: string) => {
     try {
       const res = await fetch(`/api/reports?range=${selectedRange}`);
       if (res.ok) {
@@ -85,28 +91,66 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
       console.error("Failed to fetch live reports:", err);
     } finally {
       setIsLoading(false);
-      if (showIndicator) setIsRefreshing(false);
     }
-  }, [range]);
+  }, []);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchReports(range);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    void fetchReports(range);
-  }, [range, fetchReports]);
+    let ignore = false;
+
+    const loadReports = async () => {
+      try {
+        const res = await fetch(`/api/reports?range=${range}`);
+        if (res.ok && !ignore) {
+          const json = await res.json();
+          setData(json);
+        }
+      } catch (err) {
+        if (!ignore) {
+          console.error("Failed to fetch live reports:", err);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadReports();
+
+    return () => {
+      ignore = true;
+    };
+  }, [range]);
 
   // Real-time live synchronization via Socket.io & 4s polling fallback
   useEffect(() => {
-    let socket: any;
+    let socket: Socket | undefined;
     try {
       socket = io();
-      socket.on("order:updated", () => fetchReports(range));
-      socket.on("order:served", () => fetchReports(range));
-      socket.on("order:new", () => fetchReports(range));
-      socket.on("order:ready", () => fetchReports(range));
+      const onUpdate = () => {
+        void fetchReports(range);
+      };
+      socket.on("order:updated", onUpdate);
+      socket.on("order:served", onUpdate);
+      socket.on("order:new", onUpdate);
+      socket.on("order:ready", onUpdate);
     } catch (e) {
       console.warn("Socket init skipped:", e);
     }
 
-    const interval = setInterval(() => fetchReports(range, false), 4000);
+    const interval = setInterval(() => {
+      void fetchReports(range);
+    }, 4000);
+
     return () => {
       clearInterval(interval);
       if (socket) socket.disconnect();
@@ -158,7 +202,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
     link.setAttribute("download", `restaurant-report-${range}-${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
   };
 
   if (isLoading || !data) {
@@ -176,7 +220,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
 
   return (
     <div className="space-y-6 pb-12 font-sans">
-      
+
       {/* Top Header & Range Filters */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 print:hidden">
         <div>
@@ -185,8 +229,8 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
               Reports & Analytics
             </h1>
             <span className="flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live Sync
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Live Sync</span>
             </span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
@@ -204,11 +248,10 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
                   key={opt.value}
                   type="button"
                   onClick={() => setRange(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                    isSelected
-                      ? "bg-white text-culinary-primary shadow-sm font-bold"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${isSelected
+                    ? "bg-white text-culinary-primary shadow-sm font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                    }`}
                 >
                   {opt.label}
                 </button>
@@ -220,7 +263,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
           <Button
             variant="outline"
             size="sm"
-            onClick={() => fetchReports(range, true)}
+            onClick={handleManualRefresh}
             disabled={isRefreshing}
             className="text-xs h-9 gap-1.5 border-gray-200 bg-white hover:bg-gray-50 text-gray-700 rounded-xl shadow-none"
           >
@@ -346,7 +389,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
                 tick={{ fontSize: 11, fill: "#888888" }}
               />
               <Tooltip
-                formatter={(val: any) => [`₹${Number(val || 0).toFixed(2)}`, "Revenue"]}
+                formatter={(val: unknown) => [`₹${Number(val || 0).toFixed(2)}`, "Revenue"]}
                 labelStyle={{ fontWeight: "bold", color: "#111827" }}
                 contentStyle={{
                   backgroundColor: "#ffffff",
@@ -364,7 +407,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
 
       {/* Row 2: Payment Analytics & Order Status Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Payment Methods Analytics */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-sm flex flex-col justify-between">
           <div>
@@ -382,19 +425,18 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={data.paymentAnalytics}
+                    data={data.paymentAnalytics.map((entry, index) => ({
+                      ...entry,
+                      fill: CHART_COLORS[index % CHART_COLORS.length],
+                    }))}
                     cx="50%"
                     cy="50%"
                     innerRadius={55}
                     outerRadius={75}
                     paddingAngle={4}
                     dataKey="value"
-                  >
-                    {data.paymentAnalytics.map((entry, index) => (
-                      <Cell key={`cell-pay-${entry.name}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(val: any) => [`₹${Number(val || 0).toFixed(2)}`, "Collected"]} />
+                  />
+                  <Tooltip formatter={(val: unknown) => [`₹${Number(val || 0).toFixed(2)}`, "Collected"]} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -444,19 +486,18 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={data.orderAnalytics}
+                      data={data.orderAnalytics.map((entry, index) => ({
+                        ...entry,
+                        fill: CHART_COLORS[index % CHART_COLORS.length],
+                      }))}
                       cx="50%"
                       cy="50%"
                       innerRadius={55}
                       outerRadius={75}
                       paddingAngle={4}
                       dataKey="orders"
-                    >
-                      {data.orderAnalytics.map((entry, index) => (
-                        <Cell key={`cell-status-${entry.name}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(val: any) => [`${val} orders`, "Volume"]} />
+                    />
+                    <Tooltip formatter={(val: unknown) => [`${Number(val ?? 0)} orders`, "Volume"]} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: "12px" }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -482,7 +523,7 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
 
       {/* Row 3: Top Selling Dishes Leaderboard & Category Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Top Selling Dishes Leaderboard */}
         <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-sm">
           <div className="flex justify-between items-center mb-5 pb-3 border-b border-gray-100">
@@ -504,15 +545,9 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
                   <div className="flex justify-between items-center text-xs">
                     <div className="flex items-center gap-2 min-w-0">
                       <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                          idx === 0
-                            ? "bg-amber-100 text-amber-800"
-                            : idx === 1
-                            ? "bg-gray-200 text-gray-700"
-                            : idx === 2
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-gray-100 text-gray-500"
-                        }`}
+                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${getProductRankBadgeStyle(
+                          idx
+                        )}`}
                       >
                         #{idx + 1}
                       </span>
@@ -599,22 +634,34 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
 
       {/* Row 4: Table Turnover & Active Tables */}
       <div className="bg-white p-6 rounded-2xl border border-gray-200/80 shadow-sm">
-        <div className="flex justify-between items-center mb-5 pb-3 border-b border-gray-100">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5 pb-3 border-b border-gray-100">
           <div>
             <h3 className="text-lg font-bold text-gray-900 font-cormorant text-xl flex items-center gap-2">
               <Utensils className="text-emerald-600 h-5 w-5" /> Table Turnover & Revenue Performance
             </h3>
             <p className="text-xs text-gray-400">Sales volume and order counts generated per dining table</p>
           </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAllTablesModalOpen(true)}
+              className="rounded-xl border-emerald-200 bg-emerald-50/60 hover:bg-emerald-100/80 text-emerald-900 font-bold text-xs gap-1.5 shadow-2xs transition-all"
+            >
+              <Eye size={14} className="text-emerald-700" />
+              <span>View All ({data.tablePerformance.length})</span>
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.tablePerformance.map((table) => {
+          {data.tablePerformance.slice(0, 6).map((table) => {
             const avgTableTicket = table.orderCount > 0 ? table.revenue / table.orderCount : 0;
             return (
               <div
                 key={table.name}
-                className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 space-y-2 hover:bg-gray-50 transition-colors"
+                className="bg-gray-50/70 p-4 rounded-xl border border-gray-100 space-y-2 hover:bg-gray-50 hover:border-gray-200 transition-colors"
               >
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-sm text-culinary-primary font-cormorant text-base">
@@ -644,7 +691,32 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
             </div>
           )}
         </div>
+
+        {/* Footer info banner if more than 6 tables */}
+        {data.tablePerformance.length > 6 && (
+          <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              Showing top <strong>6</strong> of <strong>{data.tablePerformance.length}</strong> dining tables
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsAllTablesModalOpen(true)}
+              className="text-emerald-700 font-bold hover:underline inline-flex items-center gap-1"
+            >
+              <span>View all {data.tablePerformance.length} tables</span>
+              <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Complete All Tables Performance Modal */}
+      <AllTablesTurnoverModal
+        isOpen={isAllTablesModalOpen}
+        onClose={() => setIsAllTablesModalOpen(false)}
+        tables={data.tablePerformance}
+      />
     </div>
   );
 }
+

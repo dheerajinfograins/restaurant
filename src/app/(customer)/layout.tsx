@@ -3,8 +3,8 @@ import { CartFloatingButton } from "@/components/customer/cart-floating-button";
 
 export default function CustomerLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className="min-h-screen bg-[#FDFBF7] text-culinary-text selection:bg-culinary-primary/20">
-      <main className="mx-auto max-w-md min-h-screen bg-white shadow-2xl relative pb-24 sm:pb-0 overflow-x-hidden">
+    <div className="min-h-screen bg-stone-100 flex justify-center text-stone-900 selection:bg-amber-700 selection:text-white">
+      <main className="w-full max-w-md min-h-screen bg-[#FDFBF7] shadow-2xl relative overflow-x-hidden border-x border-stone-200/70">
         {children}
         <CartFloatingButton />
       </main>

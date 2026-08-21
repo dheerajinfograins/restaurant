@@ -2,6 +2,8 @@ import { CreateProductDto, UpdateProductDto } from "./dto";
 import productRepository, { ProductFilters } from "./repository";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { PRODUCT_MESSAGES } from "./constants";
+import { deleteImageFromCloudinary, uploadImageToCloudinary } from "@/lib/cloudinary";
+import { prisma } from "@/lib/prisma";
 
 class ProductService {
   /**
@@ -27,8 +29,20 @@ class ProductService {
 
     const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
 
+    let imageUrl = data.image;
+    // If image is a base64 data URI, upload directly to Cloudinary
+    if (imageUrl?.startsWith("data:image")) {
+      try {
+        const uploadResult = await uploadImageToCloudinary(imageUrl, "products");
+        imageUrl = uploadResult.url;
+      } catch (err) {
+        console.error("Failed to upload product image to Cloudinary:", err);
+      }
+    }
+
     return productRepository.create({
       ...data,
+      image: imageUrl,
       slug,
       restaurantId,
     });
@@ -66,6 +80,25 @@ class ProductService {
       updateData.slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     }
 
+    // Handle image update & cleanup
+    if (data.image !== undefined) {
+      let newImageUrl = data.image;
+      if (newImageUrl?.startsWith("data:image")) {
+        try {
+          const uploadResult = await uploadImageToCloudinary(newImageUrl, "products");
+          newImageUrl = uploadResult.url;
+          updateData.image = newImageUrl;
+        } catch (err) {
+          console.error("Failed to upload updated product image to Cloudinary:", err);
+        }
+      }
+
+      // If previous image was Cloudinary and changed, delete the old image
+      if (product.image !== newImageUrl && product.image?.includes("res.cloudinary.com")) {
+        void deleteImageFromCloudinary(product.image);
+      }
+    }
+
     return productRepository.update(id, updateData);
   }
 
@@ -73,7 +106,27 @@ class ProductService {
    * Delete a product
    */
   async deleteProduct(id: string, restaurantId: string) {
-    await this.getProduct(id, restaurantId);
+    const product = await this.getProduct(id, restaurantId);
+
+    // Check if product is referenced in order items
+    const ordersCount = await prisma.orderItem.count({
+      where: {
+        productId: id,
+      },
+    });
+
+    if (ordersCount > 0) {
+      throw new AppError(
+        "Cannot delete product because it is associated with existing order records. You can mark it as unavailable instead to hide it from the menu.",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    // Delete image from Cloudinary if exists
+    if (product.image?.includes("res.cloudinary.com")) {
+      void deleteImageFromCloudinary(product.image);
+    }
+
     return productRepository.delete(id);
   }
 }
