@@ -2,11 +2,22 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { autoProgressOrders } from "@/lib/order-auto-progress";
+import { getAuthenticatedRestaurantId } from "@/lib/permissions";
 
 export async function GET() {
   try {
+    const restaurantId = await getAuthenticatedRestaurantId([
+      "SUPER_ADMIN",
+      "OWNER",
+      "MANAGER",
+      "WAITER",
+      "CASHIER",
+      "KITCHEN",
+    ]);
+
     let orders = await prisma.order.findMany({
       where: {
+        restaurantId,
         status: {
           in: [OrderStatus.PENDING, OrderStatus.ACCEPTED, OrderStatus.PREPARING, OrderStatus.READY],
         },

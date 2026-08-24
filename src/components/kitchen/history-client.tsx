@@ -178,18 +178,17 @@ export function HistoryClient({ history: initialHistory }: Readonly<{ history: H
   const startItemNumber = totalItems === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
   const endItemNumber = Math.min(safeCurrentPage * pageSize, totalItems);
 
-  // Generate pagination buttons
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
     if (totalPages <= 7) {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (safeCurrentPage > 3) pages.push("...");
+      if (safeCurrentPage > 3) pages.push("dots-prev");
       const start = Math.max(2, safeCurrentPage - 1);
       const end = Math.min(totalPages - 1, safeCurrentPage + 1);
       for (let i = start; i <= end; i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push("...");
+      if (safeCurrentPage < totalPages - 2) pages.push("dots-next");
       pages.push(totalPages);
     }
     return pages;
@@ -505,28 +504,27 @@ export function HistoryClient({ history: initialHistory }: Readonly<{ history: H
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
-            {/* Page number buttons */}
             <div className="flex items-center gap-1 mx-1">
-              {getPageNumbers().map((p, idx) => {
-                if (p === "...") {
+              {getPageNumbers().map((p) => {
+                if (typeof p === "string") {
                   return (
-                    <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400">
+                    <span key={p} className="px-2 text-xs text-gray-400">
                       ...
                     </span>
                   );
                 }
-                const pageNum = Number(p);
-                const isCurrent = pageNum === safeCurrentPage;
+                const isCurrent = p === safeCurrentPage;
                 return (
-                  <button type="button"
-                    key={`p-${pageNum}`}
-                    onClick={() => setCurrentPage(pageNum)}
+                  <button
+                    type="button"
+                    key={`p-${p}`}
+                    onClick={() => setCurrentPage(p)}
                     className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
                       ? "bg-culinary-primary text-white shadow-sm"
                       : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
                       }`}
                   >
-                    {pageNum}
+                    {p}
                   </button>
                 );
               })}

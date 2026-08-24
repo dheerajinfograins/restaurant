@@ -5,6 +5,13 @@ import { PRODUCT_MESSAGES } from "./constants";
 import { deleteImageFromCloudinary, uploadImageToCloudinary } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 class ProductService {
   /**
    * Get all products for a restaurant
@@ -13,32 +20,83 @@ class ProductService {
     return productRepository.findByRestaurantId(restaurantId, filters);
   }
 
-  /**
-   * Create a new product
-   */
-  async createProduct(restaurantId: string, data: CreateProductDto) {
-    // Check if product with same name exists for this restaurant
-    const existingProduct = await productRepository.findByName(data.name, restaurantId);
-    
+  private async validateDietaryRestrictions(
+    restaurantId: string,
+    foodType?: string,
+    action: "add" | "set" = "set"
+  ) {
+    if (!foodType) return;
+
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { dietaryCategory: true },
+    });
+
+    if (restaurant?.dietaryCategory === "PURE_VEG" && foodType !== "VEG") {
+      throw new AppError(
+        action === "add"
+          ? "Cannot add non-vegetarian or egg items to a Pure Veg restaurant."
+          : "Cannot set non-vegetarian or egg items in a Pure Veg restaurant.",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+
+    if (restaurant?.dietaryCategory === "PURE_NON_VEG" && foodType === "VEG") {
+      throw new AppError(
+        action === "add"
+          ? "Cannot add vegetarian items to a Pure Non-Veg restaurant. Only Non-Veg and Egg dishes are permitted."
+          : "Cannot set vegetarian items in a Pure Non-Veg restaurant. Only Non-Veg and Egg dishes are permitted.",
+        HTTP_STATUS.BAD_REQUEST
+      );
+    }
+  }
+
+  private async validateUniqueName(name: string, restaurantId: string) {
+    const existingProduct = await productRepository.findByName(name, restaurantId);
     if (existingProduct) {
       throw new AppError(
         PRODUCT_MESSAGES.ALREADY_EXISTS,
         HTTP_STATUS.CONFLICT
       );
     }
+  }
 
-    const slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-
-    let imageUrl = data.image;
-    // If image is a base64 data URI, upload directly to Cloudinary
-    if (imageUrl?.startsWith("data:image")) {
-      try {
-        const uploadResult = await uploadImageToCloudinary(imageUrl, "products");
-        imageUrl = uploadResult.url;
-      } catch (err) {
-        console.error("Failed to upload product image to Cloudinary:", err);
-      }
+  private async processImageUpload(image?: string | null): Promise<string | null | undefined> {
+    if (!image?.startsWith("data:image")) {
+      return image;
     }
+
+    try {
+      const uploadResult = await uploadImageToCloudinary(image, "products");
+      return uploadResult.url;
+    } catch (err) {
+      console.error("Failed to upload product image to Cloudinary:", err);
+      return image;
+    }
+  }
+
+  private async handleImageUpdate(
+    oldImage: string | null | undefined,
+    newImage?: string | null
+  ): Promise<string | null | undefined> {
+    const processedUrl = await this.processImageUpload(newImage);
+
+    if (oldImage && oldImage !== processedUrl && oldImage.includes("res.cloudinary.com")) {
+      void deleteImageFromCloudinary(oldImage);
+    }
+
+    return processedUrl;
+  }
+
+  /**
+   * Create a new product
+   */
+  async createProduct(restaurantId: string, data: CreateProductDto) {
+    await this.validateDietaryRestrictions(restaurantId, data.foodType, "add");
+    await this.validateUniqueName(data.name, restaurantId);
+
+    const slug = generateSlug(data.name);
+    const imageUrl = await this.processImageUpload(data.image);
 
     return productRepository.create({
       ...data,
@@ -66,37 +124,21 @@ class ProductService {
    */
   async updateProduct(id: string, restaurantId: string, data: UpdateProductDto) {
     const product = await this.getProduct(id, restaurantId);
+
+    // Check dietary restrictions
+    await this.validateDietaryRestrictions(restaurantId, data.foodType, "set");
+
     const updateData: UpdateProductDto & { slug?: string } = { ...data };
 
     // If name is being updated, ensure it doesn't conflict and update slug
     if (data.name && data.name.toLowerCase() !== product.name.toLowerCase()) {
-      const existingProduct = await productRepository.findByName(data.name, restaurantId);
-      if (existingProduct) {
-        throw new AppError(
-          PRODUCT_MESSAGES.ALREADY_EXISTS,
-          HTTP_STATUS.CONFLICT
-        );
-      }
-      updateData.slug = data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      await this.validateUniqueName(data.name, restaurantId);
+      updateData.slug = generateSlug(data.name);
     }
 
     // Handle image update & cleanup
     if (data.image !== undefined) {
-      let newImageUrl = data.image;
-      if (newImageUrl?.startsWith("data:image")) {
-        try {
-          const uploadResult = await uploadImageToCloudinary(newImageUrl, "products");
-          newImageUrl = uploadResult.url;
-          updateData.image = newImageUrl;
-        } catch (err) {
-          console.error("Failed to upload updated product image to Cloudinary:", err);
-        }
-      }
-
-      // If previous image was Cloudinary and changed, delete the old image
-      if (product.image !== newImageUrl && product.image?.includes("res.cloudinary.com")) {
-        void deleteImageFromCloudinary(product.image);
-      }
+      updateData.image = await this.handleImageUpdate(product.image, data.image);
     }
 
     return productRepository.update(id, updateData);

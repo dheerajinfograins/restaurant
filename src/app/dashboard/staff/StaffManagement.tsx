@@ -1,9 +1,16 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
-import { Users, Armchair } from "lucide-react";
+import { Users, Armchair, Building2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger
+} from "@/components/ui/select";
 
 import { WaiterPerformanceSection } from "@/components/dashboard/waiters/WaiterPerformanceSection";
 import { Staff, StaffFormData } from "./types";
@@ -35,9 +42,21 @@ const INITIAL_FORM_DATA: StaffFormData = {
   isActive: true,
 };
 
+function getDietaryBadge(dietaryCategory?: string): string {
+  if (dietaryCategory === "PURE_VEG") return "🌱 Pure Veg";
+  if (dietaryCategory === "PURE_NON_VEG") return "🍗 Pure Non-Veg";
+  return "🥗🍗 Multi-Cuisine";
+}
+
 export function StaffManagement() {
+  const searchParams = useSearchParams();
+  const initialRestId = searchParams.get("restaurantId") || "all";
+
   const [activeTab, setActiveTab] = useState<"roster" | "waiters_monitor">("roster");
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [restaurants, setRestaurants] = useState<Array<{ id: string; name: string; dietaryCategory?: string }>>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>(initialRestId);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -60,12 +79,24 @@ export function StaffManagement() {
   const [formData, setFormData] = useState<StaffFormData>(INITIAL_FORM_DATA);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchStaff = useCallback(async (showIndicator = false) => {
+  const fetchStaff = useCallback(async (showIndicator = false, restId = selectedRestaurant) => {
     if (showIndicator) setIsRefreshing(true);
     try {
-      const response = await axios.get("/api/staff");
-      if (response.data?.data) {
-        setStaff(response.data.data);
+      const url = restId && restId !== "all" ? `/api/staff?restaurantId=${restId}` : "/api/staff";
+      const [staffRes, superAdminRes] = await Promise.all([
+        axios.get(url),
+        axios.get("/api/super-admin/restaurants").catch(() => null),
+      ]);
+      if (staffRes.data?.data) {
+        if (Array.isArray(staffRes.data.data)) {
+          setStaff(staffRes.data.data);
+        } else if (staffRes.data.data.staff) {
+          setStaff(staffRes.data.data.staff);
+        }
+      }
+      if (superAdminRes?.data?.success && Array.isArray(superAdminRes.data.data)) {
+        setIsSuperAdmin(true);
+        setRestaurants(superAdminRes.data.data);
       }
     } catch (error: unknown) {
       console.error("Failed to fetch staff:", error);
@@ -73,16 +104,32 @@ export function StaffManagement() {
       setIsLoading(false);
       if (showIndicator) setIsRefreshing(false);
     }
-  }, []);
+  }, [selectedRestaurant]);
 
   useEffect(() => {
     let ignore = false;
 
     const loadStaff = async () => {
       try {
-        const response = await axios.get("/api/staff");
-        if (!ignore && response.data?.data) {
-          setStaff(response.data.data);
+        const url = selectedRestaurant && selectedRestaurant !== "all"
+          ? `/api/staff?restaurantId=${selectedRestaurant}`
+          : "/api/staff";
+        const [staffRes, superAdminRes] = await Promise.all([
+          axios.get(url),
+          axios.get("/api/super-admin/restaurants").catch(() => null),
+        ]);
+        if (!ignore) {
+          if (staffRes.data?.data) {
+            if (Array.isArray(staffRes.data.data)) {
+              setStaff(staffRes.data.data);
+            } else if (staffRes.data.data.staff) {
+              setStaff(staffRes.data.data.staff);
+            }
+          }
+          if (superAdminRes?.data?.success && Array.isArray(superAdminRes.data.data)) {
+            setIsSuperAdmin(true);
+            setRestaurants(superAdminRes.data.data);
+          }
         }
       } catch (error: unknown) {
         if (!ignore) {
@@ -100,7 +147,7 @@ export function StaffManagement() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [selectedRestaurant]);
 
   const handleOpenForm = (staffMember?: Staff) => {
     if (staffMember) {
@@ -285,14 +332,58 @@ export function StaffManagement() {
 
   return (
     <div className="space-y-6 font-sans">
+      {/* Top Scope Bar for Super Admin */}
+      {isSuperAdmin && restaurants.length > 0 && (
+        <div className="bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-2xs flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500">Restaurant Scope:</span>
+            <Select
+              value={selectedRestaurant}
+              onValueChange={(val) => {
+                setSelectedRestaurant(val ?? "all");
+              }}
+            >
+              <SelectTrigger className="rounded-xl border-gray-200 text-xs bg-amber-50/70 hover:bg-amber-50 h-9.5 w-full sm:w-80 shadow-2xs font-semibold text-gray-900 border-amber-200/80 transition-colors">
+                <div className="flex items-center gap-2 truncate">
+                  <Building2 size={15} className="text-culinary-primary shrink-0" />
+                  <span className="truncate">
+                    {selectedRestaurant === "all"
+                      ? "🏢 All Restaurants (Platform Staff)"
+                      : restaurants.find((r) => r.id === selectedRestaurant)?.name || "Select Restaurant"}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl text-xs w-[360px] min-w-[360px] max-h-72 overflow-y-auto p-1.5 shadow-xl border-gray-100 z-50">
+                <SelectItem value="all" className="font-bold text-gray-900 py-2.5 px-3 rounded-xl cursor-pointer">
+                  🏢 All Restaurants (Platform Staff)
+                </SelectItem>
+                {restaurants.map((rest) => (
+                  <SelectItem key={rest.id} value={rest.id} className="text-xs py-2.5 px-3 rounded-xl cursor-pointer">
+                    <div className="flex items-center justify-between w-full gap-3 pr-3">
+                      <span className="font-semibold text-gray-800 truncate">{rest.name}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200/80 text-stone-700 font-medium shrink-0">
+                        {getDietaryBadge(rest.dietaryCategory)}
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <span className="text-xs text-gray-500 font-medium">
+            Showing {filteredStaff.length} team members across {selectedRestaurant === "all" ? "all restaurants" : "selected restaurant"}
+          </span>
+        </div>
+      )}
+
       {/* Top Section Navigation Tabs */}
       <div className="flex flex-wrap items-center gap-2 bg-gray-100/90 p-1.5 rounded-2xl border border-gray-200/80 max-w-fit shadow-xs">
         <button
           type="button"
           onClick={() => setActiveTab("roster")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === "roster" ? "bg-white text-gray-900 shadow-xs" : "text-gray-600 hover:text-gray-900"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === "roster" ? "bg-white text-gray-900 shadow-xs" : "text-gray-600 hover:text-gray-900"
+            }`}
         >
           <Users size={15} className={activeTab === "roster" ? "text-culinary-primary" : ""} />
           <span>Staff Team Directory</span>
@@ -301,11 +392,10 @@ export function StaffManagement() {
         <button
           type="button"
           onClick={() => setActiveTab("waiters_monitor")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === "waiters_monitor"
-              ? "bg-white text-gray-900 shadow-xs"
-              : "text-gray-600 hover:text-gray-900"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === "waiters_monitor"
+            ? "bg-white text-gray-900 shadow-xs"
+            : "text-gray-600 hover:text-gray-900"
+            }`}
         >
           <Armchair size={15} className={activeTab === "waiters_monitor" ? "text-amber-600" : ""} />
           <span>Waitstaff Live Table Tracker</span>
@@ -317,7 +407,7 @@ export function StaffManagement() {
       </div>
 
       {activeTab === "waiters_monitor" ? (
-        <WaiterPerformanceSection />
+        <WaiterPerformanceSection restaurantId={selectedRestaurant} />
       ) : (
         <>
           <StaffKpiCards stats={kpiStats} />

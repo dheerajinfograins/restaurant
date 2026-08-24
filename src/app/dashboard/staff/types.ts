@@ -6,6 +6,12 @@ export interface Staff {
   role: string;
   isActive: boolean;
   createdAt: string;
+  restaurantId?: string;
+  restaurant?: {
+    id: string;
+    name: string;
+    dietaryCategory?: string;
+  };
   _count?: {
     orders: number;
   };

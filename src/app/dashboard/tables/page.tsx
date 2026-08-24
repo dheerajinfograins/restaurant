@@ -1,32 +1,44 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { 
-  Plus, 
-  Search, 
-  RotateCw, 
-  Utensils, 
-  Users, 
-  CheckCircle2, 
-  Clock, 
-  LayoutGrid, 
-  List, 
-  QrCode,
+import {
+  Plus,
+  Search,
+  RotateCw,
+  Utensils,
+  Users,
+  CheckCircle2,
+  Clock,
+  LayoutGrid,
+  List,
   Filter,
   ChevronsLeft,
   ChevronLeft,
   ChevronRight,
-  ChevronsRight
+  ChevronsRight,
+  Building2,
 } from "lucide-react";
 import { RestaurantTable } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import TableList from "@/components/table/table-list";
-import TableFormModal from "@/components/table/table-form-modal";
+import TableFormModal, { TableFormValues } from "@/components/table/table-form-modal";
 import DeleteTableDialog from "@/components/table/delete-table-dialog";
 import TableQrModal from "@/components/table/table-qr-modal";
+
+interface RestaurantOption {
+  id: string;
+  name: string;
+  dietaryCategory: string;
+}
 
 const FILTER_TABS = [
   { label: "All Tables", value: "ALL" },
@@ -35,12 +47,38 @@ const FILTER_TABS = [
   { label: "Reserved", value: "RESERVED" },
 ] as const;
 
+const DIETARY_BADGE_CONFIG: Record<string, { label: string; className: string }> = {
+  PURE_VEG: {
+    label: "Veg",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  },
+  PURE_NON_VEG: {
+    label: "Non-Veg",
+    className: "bg-rose-50 text-rose-700 border border-rose-200",
+  },
+};
+
+const DEFAULT_DIETARY_BADGE = {
+  label: "Multi-Cuisine",
+  className: "bg-amber-50 text-amber-700 border border-amber-200",
+};
+
+function getDietaryBadge(category?: string) {
+  if (category && category in DIETARY_BADGE_CONFIG) {
+    return DIETARY_BADGE_CONFIG[category];
+  }
+  return DEFAULT_DIETARY_BADGE;
+}
+
 export default function TablesPage() {
   const [tables, setTables] = useState<RestaurantTable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
 
   // View Mode: Cards Grid vs Table List
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -53,29 +91,77 @@ export default function TablesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-  
+
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchTables = async (showIndicator = false) => {
-    if (showIndicator) setIsRefreshing(true);
+  const loadTablesData = useCallback(async (restId?: string) => {
     try {
-      const res = await axios.get("/api/tables");
-      if (res.data.success) {
-        setTables(res.data.data);
+      const activeRest = restId ?? selectedRestaurant;
+      const query = activeRest && activeRest !== "all" ? `?restaurantId=${activeRest}` : "";
+      const res = await axios.get(`/api/tables${query}`);
+      if (res.data?.success) {
+        return res.data.data as RestaurantTable[];
       }
     } catch (error) {
       toast.error("Failed to load tables");
       console.error(error);
-    } finally {
-      setIsLoading(false);
-      if (showIndicator) setIsRefreshing(false);
     }
-  };
+    return null;
+  }, [selectedRestaurant]);
 
   useEffect(() => {
-    void fetchTables();
+    let ignore = false;
+    const fetchSuperAdminData = async () => {
+      try {
+        const res = await axios.get("/api/super-admin/restaurants");
+        if (!ignore && res.data?.data && Array.isArray(res.data.data)) {
+          setIsSuperAdmin(true);
+          setRestaurants(res.data.data.map((r: RestaurantOption) => ({
+            id: r.id,
+            name: r.name,
+            dietaryCategory: r.dietaryCategory,
+          })));
+        }
+      } catch {
+        // Not a super admin
+      }
+    };
+    void fetchSuperAdminData();
+    return () => {
+      ignore = true;
+    };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      const data = await loadTablesData(selectedRestaurant);
+      if (!ignore) {
+        if (data) {
+          setTables(data);
+        }
+        setIsLoading(false);
+      }
+    }
+
+    void load();
+
+    return () => {
+      ignore = true;
+    };
+  }, [selectedRestaurant, loadTablesData]);
+
+  const fetchTables = async (showIndicator = false, restId?: string) => {
+    if (showIndicator) setIsRefreshing(true);
+    const data = await loadTablesData(restId);
+    if (data) {
+      setTables(data);
+    }
+    setIsLoading(false);
+    if (showIndicator) setIsRefreshing(false);
+  };
 
   const handleAddClick = () => {
     setSelectedTable(null);
@@ -104,12 +190,16 @@ export default function TablesPage() {
         prev.map((t) => (t.id === tableId ? { ...t, status: newStatus } : t))
       );
       toast.success(`Table status updated to ${newStatus.toLowerCase()}`);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to update status");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to update status");
+      }
     }
   };
 
-  const handleFormSubmit = async (values: any) => {
+  const handleFormSubmit = async (values: TableFormValues) => {
     setIsSubmitting(true);
     try {
       if (selectedTable) {
@@ -121,8 +211,12 @@ export default function TablesPage() {
       }
       setIsFormOpen(false);
       await fetchTables();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Something went wrong");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Something went wrong");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -137,8 +231,12 @@ export default function TablesPage() {
       setIsDeleteOpen(false);
       setSelectedTable(null);
       await fetchTables();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to delete table");
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        toast.error(error.response.data.message);
+      } else {
+        toast.error("Failed to delete table");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -189,10 +287,20 @@ export default function TablesPage() {
     });
   }, [tables, statusFilter, searchQuery]);
 
-  // Reset page when filter changes
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
     setCurrentPage(1);
-  }, [statusFilter, searchQuery, pageSize]);
+  };
+
+  const handleStatusFilterChange = (status: string) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   // Pagination calculation
   const totalItems = filteredTables.length;
@@ -213,11 +321,11 @@ export default function TablesPage() {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (safeCurrentPage > 3) pages.push("...");
+      if (safeCurrentPage > 3) pages.push("dots-prev");
       const start = Math.max(2, safeCurrentPage - 1);
       const end = Math.min(totalPages - 1, safeCurrentPage + 1);
       for (let i = start; i <= end; i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push("...");
+      if (safeCurrentPage < totalPages - 2) pages.push("dots-next");
       pages.push(totalPages);
     }
     return pages;
@@ -234,7 +342,7 @@ export default function TablesPage() {
 
   return (
     <div className="space-y-6 font-sans pb-16">
-      
+
       {/* Top Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 font-cormorant">
@@ -244,6 +352,61 @@ export default function TablesPage() {
           Manage restaurant seating capacity, table floor statuses, and instant contactless QR ordering codes.
         </p>
       </div>
+
+      {/* Super Admin Scope Selector */}
+      {isSuperAdmin && restaurants.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl border border-amber-200/60 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-amber-800 uppercase">Super Admin View Scope</p>
+              <h3 className="text-sm font-bold text-gray-900">Multi-Restaurant Tables & QR Code Generator</h3>
+            </div>
+          </div>
+          <div className="w-full sm:w-[360px] min-w-[360px]">
+            <Select
+              value={selectedRestaurant}
+              onValueChange={(val) => {
+                setSelectedRestaurant(val || "all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full h-11 bg-white border-amber-300 rounded-xl text-xs font-bold text-gray-900 shadow-xs focus:ring-amber-500">
+                <span className="truncate">
+                  {selectedRestaurant === "all"
+                    ? `🏢 All Restaurants (${restaurants.length} Outlets)`
+                    : `🏪 ${restaurants.find((r) => r.id === selectedRestaurant)?.name || "Selected Restaurant"}`}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="w-[360px] min-w-[360px] max-h-72 overflow-y-auto">
+                <SelectItem value="all" className="cursor-pointer font-bold text-xs py-2.5">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="truncate">🏢 All Restaurants (Platform Total)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 shrink-0">
+                      All Outlets
+                    </span>
+                  </div>
+                </SelectItem>
+                {restaurants.map((rest) => {
+                  const dietaryBadge = getDietaryBadge(rest.dietaryCategory);
+                  return (
+                    <SelectItem key={rest.id} value={rest.id} className="cursor-pointer text-xs py-2.5">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{rest.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${dietaryBadge.className}`}>
+                          {dietaryBadge.label}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -304,11 +467,11 @@ export default function TablesPage() {
 
       {/* Main Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-culinary-border/40 overflow-hidden">
-        
+
         {/* Top Control Bar */}
         <div className="p-5 border-b border-gray-100 space-y-4">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-            
+
             {/* Search Input */}
             <div className="relative w-full lg:w-96">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
@@ -316,12 +479,12 @@ export default function TablesPage() {
                 type="text"
                 placeholder="Search tables by number, capacity..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full pl-10 pr-9 py-2.5 text-sm rounded-xl border border-gray-200 bg-gray-50/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-culinary-primary/20 focus:border-culinary-primary transition-all placeholder:text-gray-400 text-gray-800"
               />
               {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
+                <button type="button"
+                  onClick={() => handleSearchChange("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 bg-gray-200/80 rounded-full w-4 h-4 flex items-center justify-center"
                 >
                   ✕
@@ -336,11 +499,10 @@ export default function TablesPage() {
                 <button
                   type="button"
                   onClick={() => setViewMode("cards")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    viewMode === "cards"
-                      ? "bg-white text-culinary-primary shadow-sm font-bold"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "cards"
+                    ? "bg-white text-culinary-primary shadow-sm font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                    }`}
                 >
                   <LayoutGrid size={14} />
                   <span>Cards</span>
@@ -348,11 +510,10 @@ export default function TablesPage() {
                 <button
                   type="button"
                   onClick={() => setViewMode("table")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                    viewMode === "table"
-                      ? "bg-white text-culinary-primary shadow-sm font-bold"
-                      : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "table"
+                    ? "bg-white text-culinary-primary shadow-sm font-bold"
+                    : "text-gray-600 hover:text-gray-900"
+                    }`}
                 >
                   <List size={14} />
                   <span>Table</span>
@@ -391,20 +552,18 @@ export default function TablesPage() {
               const count = filterCounts[tab.value] || 0;
               const isSelected = statusFilter === tab.value;
               return (
-                <button
+                <button type="button"
                   key={tab.value}
-                  onClick={() => setStatusFilter(tab.value)}
-                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-culinary-primary text-white shadow-sm font-semibold"
-                      : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/70"
-                  }`}
+                  onClick={() => handleStatusFilterChange(tab.value)}
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${isSelected
+                    ? "bg-culinary-primary text-white shadow-sm font-semibold"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/70"
+                    }`}
                 >
                   {tab.label}
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                      isSelected ? "bg-white/20 text-white" : "bg-white text-gray-600 border border-gray-200"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${isSelected ? "bg-white/20 text-white" : "bg-white text-gray-600 border border-gray-200"
+                      }`}
                   >
                     {count}
                   </span>
@@ -434,7 +593,7 @@ export default function TablesPage() {
                 <span className="font-medium">Per page:</span>
                 <select
                   value={pageSize}
-                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                   className="bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30"
                 >
                   <option value={6}>6</option>
@@ -477,27 +636,26 @@ export default function TablesPage() {
               </Button>
 
               <div className="flex items-center gap-1 mx-1">
-                {getPageNumbers().map((p, idx) => {
-                  if (p === "...") {
+                {getPageNumbers().map((p) => {
+                  if (typeof p === "string") {
                     return (
-                      <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400">
+                      <span key={p} className="px-2 text-xs text-gray-400">
                         ...
                       </span>
                     );
                   }
-                  const pageNum = Number(p);
-                  const isCurrent = pageNum === safeCurrentPage;
+                  const isCurrent = p === safeCurrentPage;
                   return (
                     <button
-                      key={`page-${pageNum}`}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${
-                        isCurrent
-                          ? "bg-culinary-primary text-white shadow-sm"
-                          : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
-                      }`}
+                      type="button"
+                      key={`page-${p}`}
+                      onClick={() => setCurrentPage(p)}
+                      className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
+                        ? "bg-culinary-primary text-white shadow-sm"
+                        : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
+                        }`}
                     >
-                      {pageNum}
+                      {p}
                     </button>
                   );
                 })}

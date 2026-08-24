@@ -8,7 +8,7 @@ import OpeningHoursSettings from "@/components/dashboard/settings/OpeningHoursSe
 import OrderSettings from "@/components/dashboard/settings/OrderSettings";
 import QRMenuSettings from "@/components/dashboard/settings/QRMenuSettings";
 import AccountSettings from "@/components/dashboard/settings/AccountSettings";
-import { Receipt, Clock, ShoppingBag, QrCode, UserCircle, Settings as SettingsIcon } from "lucide-react";
+import { Receipt, Clock, ShoppingBag, QrCode, UserCircle } from "lucide-react";
 
 interface SystemData {
   gstNumber?: string | null;
@@ -31,15 +31,24 @@ interface SystemData {
 }
 
 export default function SettingsClient() {
-  const [activeTab, setActiveTab] = useState("tax");
+  const [activeTab, setActiveTab] = useState("account");
   const [loading, setLoading] = useState(true);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [system, setSystem] = useState<SystemData | null>(null);
 
   const fetchSettings = useCallback(async () => {
     try {
       const { data } = await axios.get("/api/settings");
-      setSystem(data.data.system);
-    } catch (error) {
+      if (data?.data) {
+        setIsSuperAdmin(Boolean(data.data.isSuperAdmin));
+        setSystem(data.data.system);
+        if (!data.data.isSuperAdmin) {
+          setActiveTab((prev) => (prev === "account" ? "tax" : prev));
+        } else {
+          setActiveTab("account");
+        }
+      }
+    } catch (error: unknown) {
       console.error("Error fetching settings:", error);
       toast.error("Failed to fetch settings");
     } finally {
@@ -48,22 +57,61 @@ export default function SettingsClient() {
   }, []);
 
   useEffect(() => {
-    void fetchSettings();
-  }, [fetchSettings]);
+    let ignore = false;
 
-  const TABS = [
-    { id: "tax", label: "Tax & Billing", icon: Receipt, badge: "GST 5%" },
-    { id: "hours", label: "Opening Hours", icon: Clock, badge: "7 Days" },
-    { id: "orders", label: "Order Settings", icon: ShoppingBag, badge: "Rules" },
-    { id: "qr", label: "QR / Menu", icon: QrCode, badge: "Branding" },
-    { id: "account", label: "Admin Account", icon: UserCircle, badge: "Security" },
-  ];
+    const loadSettings = async () => {
+      try {
+        const { data } = await axios.get("/api/settings");
+        if (!ignore && data?.data) {
+          setIsSuperAdmin(Boolean(data.data.isSuperAdmin));
+          setSystem(data.data.system);
+          if (!data.data.isSuperAdmin) {
+            setActiveTab((prev) => (prev === "account" ? "tax" : prev));
+          } else {
+            setActiveTab("account");
+          }
+        }
+      } catch (error: unknown) {
+        if (!ignore) {
+          console.error("Error fetching settings:", error);
+          toast.error("Failed to fetch settings");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadSettings();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const TABS = isSuperAdmin
+    ? [
+        {
+          id: "account",
+          label: "Super Admin Account & Security",
+          icon: UserCircle,
+          badge: "Security",
+        },
+      ]
+    : [
+        { id: "tax", label: "Tax & Billing", icon: Receipt, badge: "GST 5%" },
+        { id: "hours", label: "Opening Hours", icon: Clock, badge: "7 Days" },
+        { id: "orders", label: "Order Settings", icon: ShoppingBag, badge: "Rules" },
+        { id: "qr", label: "QR / Menu", icon: QrCode, badge: "Branding" },
+        { id: "account", label: "Admin Account", icon: UserCircle, badge: "Security" },
+      ];
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-3xl border border-gray-100 shadow-sm">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-culinary-primary border-t-transparent"></div>
-        <p className="text-sm font-semibold text-gray-500">Loading restaurant system settings...</p>
+        <p className="text-sm font-semibold text-gray-500">Loading settings & configurations...</p>
       </div>
     );
   }
@@ -72,7 +120,7 @@ export default function SettingsClient() {
     <div className="space-y-6 font-sans pb-16">
       
       {/* Horizontal Nav Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin bg-gray-100/90 p-1.5 rounded-2xl border border-gray-200/80">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin bg-gray-100/90 p-1.5 rounded-2xl border border-gray-200/80 max-w-fit shadow-xs">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -81,7 +129,7 @@ export default function SettingsClient() {
               type="button"
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+              className={`whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
                 isActive
                   ? "bg-white text-culinary-primary shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
@@ -105,10 +153,10 @@ export default function SettingsClient() {
 
       {/* Main Settings Panel */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden p-6 md:p-8 animate-in fade-in duration-200">
-        {activeTab === "tax" && <TaxBillingSettings data={system} refresh={fetchSettings} />}
-        {activeTab === "hours" && <OpeningHoursSettings data={system} refresh={fetchSettings} />}
-        {activeTab === "orders" && <OrderSettings data={system} refresh={fetchSettings} />}
-        {activeTab === "qr" && <QRMenuSettings data={system} refresh={fetchSettings} />}
+        {!isSuperAdmin && activeTab === "tax" && <TaxBillingSettings data={system} refresh={fetchSettings} />}
+        {!isSuperAdmin && activeTab === "hours" && <OpeningHoursSettings data={system} refresh={fetchSettings} />}
+        {!isSuperAdmin && activeTab === "orders" && <OrderSettings data={system} refresh={fetchSettings} />}
+        {!isSuperAdmin && activeTab === "qr" && <QRMenuSettings data={system} refresh={fetchSettings} />}
         {activeTab === "account" && <AccountSettings refresh={fetchSettings} />}
       </div>
     </div>

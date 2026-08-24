@@ -796,7 +796,11 @@ function WaiterDetailsDrawer({
   );
 }
 
-export function WaiterPerformanceSection() {
+interface WaiterPerformanceSectionProps {
+  restaurantId?: string;
+}
+
+export function WaiterPerformanceSection({ restaurantId }: Readonly<WaiterPerformanceSectionProps> = {}) {
   const { socket } = useSocket();
   const [waiters, setWaiters] = useState<WaiterPerformance[]>([]);
   const [summary, setSummary] = useState<WaiterSummary>({
@@ -842,7 +846,10 @@ export function WaiterPerformanceSection() {
 
   const fetchPerformance = useCallback(async () => {
     try {
-      const res = await axios.get("/api/waiter/performance");
+      const url = restaurantId && restaurantId !== "all"
+        ? `/api/waiter/performance?restaurantId=${restaurantId}`
+        : "/api/waiter/performance";
+      const res = await axios.get(url);
       if (res.data) {
         setWaiters(res.data.waiters || []);
         if (res.data.summary) {
@@ -860,7 +867,7 @@ export function WaiterPerformanceSection() {
       console.error("Failed to fetch waiter performance:", err);
       return false;
     }
-  }, []);
+  }, [restaurantId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

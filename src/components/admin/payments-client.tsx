@@ -29,8 +29,15 @@ import {
   DollarSign,
   TrendingUp,
   FileText,
-  ChevronDown
+  ChevronDown,
+  Building2,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import {
@@ -54,6 +61,11 @@ interface PaymentOrder {
   updatedAt: Date;
   notes: string | null;
   table: { tableNumber: string };
+  restaurant?: {
+    id: string;
+    name: string;
+    dietaryCategory: string;
+  };
   items: Array<{
     id: string;
     quantity: number;
@@ -62,6 +74,12 @@ interface PaymentOrder {
     product: { name: string; price?: number };
   }>;
   totalAmount: number | string;
+}
+
+interface RestaurantOption {
+  id: string;
+  name: string;
+  dietaryCategory: string;
 }
 
 interface KpiStats {
@@ -191,6 +209,29 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | stri
   if (currentPage < totalPages - 2) pages.push("ellipsis-end");
   pages.push(totalPages);
   return pages;
+}
+
+const DIETARY_BADGE_CONFIG: Record<string, { label: string; className: string }> = {
+  PURE_VEG: {
+    label: "Veg",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  },
+  PURE_NON_VEG: {
+    label: "Non-Veg",
+    className: "bg-rose-50 text-rose-700 border border-rose-200",
+  },
+};
+
+const DEFAULT_DIETARY_BADGE = {
+  label: "Multi-Cuisine",
+  className: "bg-amber-50 text-amber-700 border border-amber-200",
+};
+
+function getDietaryBadge(category?: string) {
+  if (category && category in DIETARY_BADGE_CONFIG) {
+    return DIETARY_BADGE_CONFIG[category];
+  }
+  return DEFAULT_DIETARY_BADGE;
 }
 
 /* =========================================================================
@@ -353,6 +394,11 @@ function PaymentCardsView({
                     <p className="text-xs text-gray-400 font-mono uppercase tracking-wider mt-0.5">
                       {order.orderNumber}
                     </p>
+                    {order.restaurant?.name && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full inline-block mt-1">
+                        🏢 {order.restaurant.name}
+                      </span>
+                    )}
                   </div>
                   <div className="text-right flex flex-col items-end gap-1">
                     <span className="inline-flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600">
@@ -549,6 +595,11 @@ function PaymentTableView({
                 <TableCell className="font-bold text-gray-900 align-top py-4 pl-6 whitespace-nowrap">
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-gray-900">{order.orderNumber}</span>
+                    {order.restaurant?.name && (
+                      <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full inline-block mt-1 truncate max-w-[120px]">
+                        🏢 {order.restaurant.name}
+                      </span>
+                    )}
                     <span className="text-[10px] text-gray-400 font-mono mt-0.5">ID: {order.id.slice(-6)}</span>
                   </div>
                 </TableCell>
@@ -1162,6 +1213,9 @@ export function PaymentsClient() {
   const [orders, setOrders] = useState<PaymentOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
 
   // View Mode: Cards vs Table (default to cards matching user's request)
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
@@ -1185,7 +1239,8 @@ export function PaymentsClient() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await fetch("/api/orders");
+      const query = selectedRestaurant && selectedRestaurant !== "all" ? `?restaurantId=${selectedRestaurant}` : "";
+      const res = await fetch(`/api/orders${query}`);
       if (res.ok) {
         const rawData = (await res.json()) as Array<Omit<PaymentOrder, "createdAt" | "updatedAt"> & { createdAt: string; updatedAt: string }>;
         const formattedData: PaymentOrder[] = rawData.map((o) => ({
@@ -1212,13 +1267,35 @@ export function PaymentsClient() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedRestaurant]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchOrders();
     setIsRefreshing(false);
   };
+
+  useEffect(() => {
+    const fetchSuperAdminData = async () => {
+      try {
+        const res = await fetch("/api/super-admin/restaurants");
+        if (res.ok) {
+          const json = await res.json();
+          if (json?.data && Array.isArray(json.data)) {
+            setIsSuperAdmin(true);
+            setRestaurants(json.data.map((r: RestaurantOption) => ({
+              id: r.id,
+              name: r.name,
+              dietaryCategory: r.dietaryCategory,
+            })));
+          }
+        }
+      } catch {
+        // Not a super admin
+      }
+    };
+    void fetchSuperAdminData();
+  }, []);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -1352,6 +1429,61 @@ export function PaymentsClient() {
 
   return (
     <div className="space-y-6 font-sans">
+      {/* Super Admin Scope Selector */}
+      {isSuperAdmin && restaurants.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl border border-amber-200/60 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-amber-800 uppercase">Super Admin View Scope</p>
+              <h3 className="text-sm font-bold text-gray-900">Multi-Restaurant Payments & Settlements</h3>
+            </div>
+          </div>
+          <div className="w-full sm:w-[360px] min-w-[360px]">
+            <Select
+              value={selectedRestaurant}
+              onValueChange={(val) => {
+                setSelectedRestaurant(val || "all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full h-11 bg-white border-amber-300 rounded-xl text-xs font-bold text-gray-900 shadow-xs focus:ring-amber-500">
+                <span className="truncate">
+                  {selectedRestaurant === "all"
+                    ? `🏢 All Restaurants (${restaurants.length} Outlets)`
+                    : `🏪 ${restaurants.find((r) => r.id === selectedRestaurant)?.name || "Selected Restaurant"}`}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="w-[360px] min-w-[360px] max-h-72 overflow-y-auto">
+                <SelectItem value="all" className="cursor-pointer font-bold text-xs py-2.5">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="truncate">🏢 All Restaurants (Platform Total)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 shrink-0">
+                      All Outlets
+                    </span>
+                  </div>
+                </SelectItem>
+                {restaurants.map((rest) => {
+                  const badge = getDietaryBadge(rest.dietaryCategory);
+                  return (
+                    <SelectItem key={rest.id} value={rest.id} className="cursor-pointer text-xs py-2.5">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{rest.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
       {/* Top KPI Cards Overview */}
       <PaymentKpiCards stats={kpiStats} />
 

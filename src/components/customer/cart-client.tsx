@@ -73,6 +73,32 @@ export function CartClient() {
     return null;
   };
 
+  const hasVeg = items.some((i) => i.foodType === "VEG");
+  const hasNonVeg = items.some((i) => i.foodType === "NON_VEG");
+  const hasEgg = items.some((i) => i.foodType === "EGG");
+
+  const dietaryNotice = (() => {
+    if (!hasVeg && (hasNonVeg || hasEgg)) {
+      return {
+        badge: "100% Non-Veg & Egg Order",
+        color: "bg-rose-50 border-rose-200 text-rose-800",
+        icon: "🍗",
+      };
+    }
+    if (hasVeg && !hasNonVeg && !hasEgg) {
+      return {
+        badge: "100% Pure Vegetarian Order",
+        color: "bg-emerald-50 border-emerald-200 text-emerald-800",
+        icon: "🌱",
+      };
+    }
+    return {
+      badge: "Multi-Cuisine Dining Order",
+      color: "bg-amber-50 border-amber-200 text-amber-900",
+      icon: "🥗🍗",
+    };
+  })();
+
   return (
     <div className="min-h-screen bg-[#FDFBF7] pb-36 animate-in fade-in-50 duration-300">
       {/* Header Bar */}
@@ -99,6 +125,15 @@ export function CartClient() {
       </header>
 
       <main className="px-5 pt-5 space-y-5">
+        {/* Dietary Classification Banner */}
+        <div className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-semibold ${dietaryNotice.color}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-base">{dietaryNotice.icon}</span>
+            <span>{dietaryNotice.badge}</span>
+          </div>
+          <span className="text-[10px] opacity-75 font-mono uppercase tracking-wider">Verified Kitchen</span>
+        </div>
+
         {/* Cart Item Cards */}
         <section className="space-y-3">
           <div className="flex items-center justify-between px-1">

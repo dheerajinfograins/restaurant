@@ -25,6 +25,12 @@ enum UserRole {
   CASHIER
 }
 
+enum DietaryCategory {
+  PURE_VEG
+  PURE_NON_VEG
+  BOTH
+}
+
 enum TableStatus {
   AVAILABLE
   OCCUPIED
@@ -36,20 +42,22 @@ enum TableStatus {
 // =============================
 
 model Restaurant {
-  id       String  @id @default(cuid())
-  name     String
-  email    String  @unique
-  phone    String  @unique
-  address      String
-  city         String?
-  state        String?
-  country      String?
-  pincode      String?
-  website      String?
-  description  String?
-  logo         String?
-  coverImage   String?
-  isActive     Boolean @default(true)
+  id              String          @id @default(cuid())
+  name            String
+  dietaryCategory DietaryCategory @default(BOTH)
+  email           String          @unique
+  phone           String          @unique
+  address         String
+  city            String?
+  state           String?
+  country         String?
+  pincode         String?
+  fssaiLicense    String?
+  website         String?
+  description     String?
+  logo            String?
+  coverImage      String?
+  isActive        Boolean         @default(true)
 
   settings   RestaurantSettings?
   users      User[]

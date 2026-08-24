@@ -23,22 +23,16 @@ import {
   ArrowRight,
   Copy,
   Check,
-  Flame,
   ShieldCheck,
-  CreditCard,
   Layers,
   Store,
   Clock,
   Printer,
-  FileCheck,
-  Info,
   X,
-  SlidersHorizontal,
   Radio,
   Trash2,
   DollarSign,
   Smartphone,
-  CheckCheck,
 } from "lucide-react";
 import {
   Dialog,
@@ -48,6 +42,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import toast from "react-hot-toast";
+import { copyToClipboard } from "@/lib/utils";
 
 // ==========================================
 // GUIDES DATA
@@ -632,11 +627,13 @@ export default function DocsView() {
     });
   }, [searchQuery, selectedFaqCategory]);
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(text);
-    toast.success("Copied to clipboard!");
-    setTimeout(() => setCopiedText(null), 2500);
+  const handleCopy = async (text: string) => {
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedText(text);
+      toast.success("Copied to clipboard!");
+      setTimeout(() => setCopiedText(null), 2500);
+    }
   };
 
   const toggleFaq = (id: string) => {
@@ -680,7 +677,7 @@ export default function DocsView() {
                 className="w-full pl-11 pr-10 py-3.5 bg-white rounded-2xl border border-gray-200/80 shadow-md shadow-black/5 focus:outline-none focus:ring-2 focus:ring-culinary-primary/30 focus:border-culinary-primary transition-all text-sm placeholder:text-gray-400 text-gray-800"
               />
               {searchQuery && (
-                <button
+                <button type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-3.5 p-1 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                 >
@@ -716,14 +713,13 @@ export default function DocsView() {
           {guideCategories.map((cat) => {
             const isActive = selectedCategory === cat.id;
             return (
-              <button
+              <button type="button"
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? "bg-culinary-primary text-white shadow-md shadow-culinary-primary/20 scale-[1.02]"
-                    : "bg-white text-culinary-muted hover:text-culinary-text hover:bg-gray-50 border border-gray-200/70"
-                }`}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${isActive
+                  ? "bg-culinary-primary text-white shadow-md shadow-culinary-primary/20 scale-[1.02]"
+                  : "bg-white text-culinary-muted hover:text-culinary-text hover:bg-gray-50 border border-gray-200/70"
+                  }`}
               >
                 {cat.label}
               </button>
@@ -757,7 +753,7 @@ export default function DocsView() {
             <p className="text-xs text-gray-500 mb-4">
               Try searching for categories, QR codes, KDS, or billing.
             </p>
-            <button
+            <button type="button"
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("all");
@@ -825,6 +821,7 @@ export default function DocsView() {
                   {/* Actions Row */}
                   <div className="pt-4 border-t border-gray-100 flex items-center justify-between relative z-10">
                     <button
+                      type="button"
                       onClick={() => setActiveGuide(guide)}
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-culinary-primary hover:text-culinary-secondary transition-colors cursor-pointer group/btn"
                     >
@@ -873,19 +870,18 @@ export default function DocsView() {
               const isActive = selectedFaqCategory === cat.id;
               return (
                 <button
+                  type="button"
                   key={cat.id}
                   onClick={() => setSelectedFaqCategory(cat.id)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isActive
-                      ? "bg-culinary-text text-white shadow-sm scale-[1.03]"
-                      : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200/80"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${isActive
+                    ? "bg-culinary-text text-white shadow-sm scale-[1.03]"
+                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200/80"
+                    }`}
                 >
                   <span>{cat.label}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"
+                      }`}
                   >
                     {cat.count}
                   </span>
@@ -902,9 +898,9 @@ export default function DocsView() {
               No questions found for this topic
             </p>
             <p className="text-xs text-gray-400 mb-4">
-              Try selecting "All Questions" or clearing your search.
+              Try selecting &quot;All Questions&quot; or clearing your search.
             </p>
-            <button
+            <button type="button"
               onClick={() => {
                 setSelectedFaqCategory("all");
                 setSearchQuery("");
@@ -923,11 +919,10 @@ export default function DocsView() {
               return (
                 <div
                   key={faq.id}
-                  className={`bg-white rounded-3xl border transition-all duration-300 overflow-hidden flex flex-col justify-between ${
-                    isExpanded
-                      ? "border-culinary-primary/40 shadow-lg ring-1 ring-culinary-primary/15 bg-white"
-                      : "border-gray-200/80 shadow-xs hover:border-gray-300 hover:shadow-md"
-                  }`}
+                  className={`bg-white rounded-3xl border transition-all duration-300 overflow-hidden flex flex-col justify-between ${isExpanded
+                    ? "border-culinary-primary/40 shadow-lg ring-1 ring-culinary-primary/15 bg-white"
+                    : "border-gray-200/80 shadow-xs hover:border-gray-300 hover:shadow-md"
+                    }`}
                 >
                   {/* Card Header (Clickable Accordion Trigger) */}
                   <button
@@ -959,11 +954,10 @@ export default function DocsView() {
 
                     {/* Chevron Toggle Button */}
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
-                        isExpanded
-                          ? "bg-culinary-primary text-white rotate-180 shadow-xs"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      }`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${isExpanded
+                        ? "bg-culinary-primary text-white rotate-180 shadow-xs"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
                     >
                       <ChevronDown size={16} />
                     </div>
@@ -1054,7 +1048,7 @@ export default function DocsView() {
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
-              <button
+              <button type="button"
                 onClick={() => setIsSupportOpen(true)}
                 className="px-6 py-3 bg-gradient-to-r from-culinary-primary to-culinary-secondary text-white text-xs sm:text-sm font-bold rounded-2xl hover:opacity-95 shadow-lg shadow-culinary-primary/30 transition-all cursor-pointer flex items-center gap-2"
               >
@@ -1311,8 +1305,8 @@ export default function DocsView() {
                   <p className="text-xs text-gray-500">support@culinaryledger.com</p>
                 </div>
               </div>
-              <button
-                onClick={() => copyToClipboard("support@culinaryledger.com")}
+              <button type="button"
+                onClick={() => handleCopy("support@culinaryledger.com")}
                 className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white shadow-2xs transition-colors"
                 title="Copy Email Address"
               >

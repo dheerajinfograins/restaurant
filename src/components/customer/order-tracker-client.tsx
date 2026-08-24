@@ -22,6 +22,8 @@ import { OrderCountdown } from "./order-countdown";
 import type { OrderStatus, PaymentMethod } from "@prisma/client";
 import toast from "react-hot-toast";
 
+import { copyToClipboard } from "@/lib/utils";
+
 interface OrderItemData {
   id: string;
   quantity: number;
@@ -78,11 +80,13 @@ export function OrderTrackerClient({ initialOrder }: { readonly initialOrder: Or
     return () => clearInterval(interval);
   }, [order.id]);
 
-  const handleCopyOrderNumber = () => {
-    navigator.clipboard?.writeText(order.orderNumber);
-    setCopied(true);
-    toast.success("Order # copied to clipboard!", { duration: 2000 });
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyOrderNumber = async () => {
+    const ok = await copyToClipboard(order.orderNumber);
+    if (ok) {
+      setCopied(true);
+      toast.success("Order # copied to clipboard!", { duration: 2000 });
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const handleCallWaiter = () => {

@@ -40,6 +40,7 @@ interface ProductFormModalProps {
   readonly product: IProduct | null;
   readonly onSuccess: () => void;
   readonly categories: ICategory[];
+  readonly dietaryCategory?: "PURE_VEG" | "PURE_NON_VEG" | "BOTH";
 }
 
 const EDIT_MODAL_LABELS = {
@@ -341,6 +342,7 @@ export function ProductFormModal({
   product,
   onSuccess,
   categories,
+  dietaryCategory = "BOTH",
 }: ProductFormModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -355,9 +357,15 @@ export function ProductFormModal({
 
   useEffect(() => {
     if (isOpen) {
-      form.reset(getDefaultFormValues(product));
+      const defaults = getDefaultFormValues(product);
+      if (dietaryCategory === "PURE_VEG") {
+        defaults.foodType = "VEG";
+      } else if (dietaryCategory === "PURE_NON_VEG" && defaults.foodType === "VEG") {
+        defaults.foodType = "NON_VEG";
+      }
+      form.reset(defaults);
     }
-  }, [isOpen, product, form]);
+  }, [isOpen, product, form, dietaryCategory]);
 
   const handleImageSelect = (file?: File, onComplete?: () => void) => {
     if (!file) return;
@@ -485,22 +493,69 @@ export function ProductFormModal({
             {/* Attributes */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-2">
-                <Label htmlFor="foodType" className="text-sm font-semibold text-culinary-text">Food Type</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="foodType" className="text-sm font-semibold text-culinary-text">Food Type</Label>
+                  {dietaryCategory === "PURE_VEG" && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      🌱 Pure Veg Only
+                    </span>
+                  )}
+                  {dietaryCategory === "PURE_NON_VEG" && (
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      🍗 Pure Non-Veg Only
+                    </span>
+                  )}
+                </div>
+
                 <Select
                   value={foodTypeValue}
+                  disabled={dietaryCategory === "PURE_VEG"}
                   onValueChange={(value) => {
                     if (value) form.setValue("foodType", value as "VEG" | "NON_VEG" | "EGG");
                   }}
                 >
-                  <SelectTrigger className="bg-white border-culinary-border shadow-sm">
+                  <SelectTrigger className={`bg-white border-culinary-border shadow-sm ${dietaryCategory === "PURE_VEG" ? "opacity-90 bg-emerald-50/40 border-emerald-300" : ""}`}>
                     <SelectValue placeholder="Select Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="VEG">Vegetarian</SelectItem>
-                    <SelectItem value="NON_VEG">Non-Vegetarian</SelectItem>
-                    <SelectItem value="EGG">Contains Egg</SelectItem>
+                    {dietaryCategory !== "PURE_NON_VEG" && (
+                      <SelectItem value="VEG">
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                          <span>Vegetarian (Pure Veg)</span>
+                        </span>
+                      </SelectItem>
+                    )}
+                    {dietaryCategory !== "PURE_VEG" && (
+                      <>
+                        <SelectItem value="NON_VEG">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-rose-500" />
+                            <span>Non-Vegetarian</span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="EGG">
+                          <span className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                            <span>Contains Egg</span>
+                          </span>
+                        </SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+
+                {dietaryCategory === "PURE_VEG" && (
+                  <p className="text-[11px] text-emerald-700 leading-tight">
+                    * Non-veg items are restricted because this establishment is registered as 100% Pure Veg.
+                  </p>
+                )}
+
+                {dietaryCategory === "PURE_NON_VEG" && (
+                  <p className="text-[11px] text-rose-700 leading-tight">
+                    * Vegetarian items are restricted because this establishment is registered as Pure Non-Veg. Only Non-Veg and Egg dishes are allowed.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalPayload } from "@/lib/permissions";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 
 export async function GET(request: Request) {
   try {
@@ -9,15 +9,18 @@ export async function GET(request: Request) {
     const specificWaiterId = searchParams.get("waiterId");
 
     const payload = await getOptionalPayload();
-    let restaurantId = payload?.restaurantId || searchParams.get("restaurantId");
+    const isSuperAdmin = payload?.role === "SUPER_ADMIN";
+    const requestedRestId = searchParams.get("restaurantId");
 
-    if (!restaurantId) {
-      const defaultRestaurant = await prisma.restaurant.findFirst();
-      restaurantId = defaultRestaurant?.id ?? null;
-    }
-
-    if (!restaurantId) {
-      return NextResponse.json({ error: "Restaurant not found" }, { status: 404 });
+    let restaurantId: string | null = null;
+    if (isSuperAdmin) {
+      restaurantId = requestedRestId && requestedRestId !== "all" ? requestedRestId : null;
+    } else {
+      restaurantId = payload?.restaurantId || requestedRestId;
+      if (!restaurantId) {
+        const defaultRestaurant = await prisma.restaurant.findFirst();
+        restaurantId = defaultRestaurant?.id ?? null;
+      }
     }
 
     // Today's start of day
@@ -27,11 +30,14 @@ export async function GET(request: Request) {
     // 30 minutes threshold for active shift presence
     const onlineThreshold = new Date(Date.now() - 30 * 60 * 1000);
 
-    const whereUserClause = {
-      restaurantId,
-      role: "WAITER" as const,
+    const whereUserClause: Prisma.UserWhereInput = {
+      role: "WAITER",
       ...(specificWaiterId ? { id: specificWaiterId } : {}),
     };
+
+    if (restaurantId) {
+      whereUserClause.restaurantId = restaurantId;
+    }
 
     const waiters = await prisma.user.findMany({
       where: whereUserClause,
@@ -88,7 +94,7 @@ export async function GET(request: Request) {
     // Also fetch all restaurant-wide served and paid orders today (both assigned & unassigned)
     const restaurantServedTodayOrders = await prisma.order.findMany({
       where: {
-        restaurantId,
+        ...(restaurantId ? { restaurantId } : {}),
         status: { in: [OrderStatus.SERVED, OrderStatus.PAID] },
         OR: [
           { updatedAt: { gte: startOfToday } },

@@ -2,20 +2,18 @@
 import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
-import { requireRoles } from "@/lib/permissions";
+import { getAuthenticatedRestaurantId, getOptionalPayload } from "@/lib/permissions";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 
 export async function GET() {
   try {
-    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-
-    if (!payload.restaurantId) {
-      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
-    }
+    const payload = await getOptionalPayload();
+    const isSuperAdmin = payload?.role === "SUPER_ADMIN";
+    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
 
     // Fetch Restaurant Profile
     const restaurant = await prisma.restaurant.findUnique({
-      where: { id: payload.restaurantId },
+      where: { id: restaurantId },
       include: {
         settings: true
       }
@@ -43,6 +41,8 @@ export async function GET() {
     });
 
     return successResponse("Settings fetched successfully", {
+      isSuperAdmin,
+      userRole: payload?.role,
       profile: {
         id: restaurant.id,
         name: restaurant.name,

@@ -21,14 +21,27 @@ import {
   ChevronsRight,
   Layers,
   Calendar,
+  Building2,
 } from "lucide-react";
 import { format } from "date-fns";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { ICategory } from "@/modules/category/types";
 import { CategoryFormModal } from "./category-form-modal";
 import { DeleteCategoryDialog } from "./delete-category-dialog";
+
+interface RestaurantOption {
+  id: string;
+  name: string;
+  dietaryCategory: string;
+}
 
 const STATUS_FILTER_TABS = [
   { label: "All Categories", value: "ALL" },
@@ -36,10 +49,33 @@ const STATUS_FILTER_TABS = [
   { label: "Inactive", value: "INACTIVE" },
 ] as const;
 
+function getDietaryBadgeClasses(dietaryCategory: string): string {
+  if (dietaryCategory === "PURE_VEG") {
+    return "bg-emerald-50 text-emerald-700 border border-emerald-200";
+  }
+  if (dietaryCategory === "PURE_NON_VEG") {
+    return "bg-rose-50 text-rose-700 border border-rose-200";
+  }
+  return "bg-amber-50 text-amber-700 border border-amber-200";
+}
+
+function getDietaryBadgeLabel(dietaryCategory: string): string {
+  if (dietaryCategory === "PURE_VEG") {
+    return "Veg";
+  }
+  if (dietaryCategory === "PURE_NON_VEG") {
+    return "Non-Veg";
+  }
+  return "Multi-Cuisine";
+}
+
 export function CategoryList() {
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
 
   // Filters and Pagination
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,7 +90,8 @@ export function CategoryList() {
 
   const fetchCategories = useCallback(async () => {
     try {
-      const response = await axios.get("/api/categories");
+      const query = selectedRestaurant && selectedRestaurant !== "all" ? `?restaurantId=${selectedRestaurant}` : "";
+      const response = await axios.get(`/api/categories${query}`);
       setCategories(response.data.data || []);
     } catch (error) {
       console.error("Failed to fetch categories:", error);
@@ -62,13 +99,36 @@ export function CategoryList() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedRestaurant]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchCategories();
     setIsRefreshing(false);
   };
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchSuperAdminData = async () => {
+      try {
+        const res = await axios.get("/api/super-admin/restaurants");
+        if (!ignore && res.data?.data && Array.isArray(res.data.data)) {
+          setIsSuperAdmin(true);
+          setRestaurants(res.data.data.map((r: RestaurantOption) => ({
+            id: r.id,
+            name: r.name,
+            dietaryCategory: r.dietaryCategory,
+          })));
+        }
+      } catch {
+        // Not a super admin
+      }
+    };
+    void fetchSuperAdminData();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -182,11 +242,11 @@ export function CategoryList() {
       for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
       pages.push(1);
-      if (safeCurrentPage > 3) pages.push("...");
+      if (safeCurrentPage > 3) pages.push("dots-prev");
       const start = Math.max(2, safeCurrentPage - 1);
       const end = Math.min(totalPages - 1, safeCurrentPage + 1);
       for (let i = start; i <= end; i++) pages.push(i);
-      if (safeCurrentPage < totalPages - 2) pages.push("...");
+      if (safeCurrentPage < totalPages - 2) pages.push("dots-next");
       pages.push(totalPages);
     }
     return pages;
@@ -211,6 +271,63 @@ export function CategoryList() {
 
   return (
     <div className="space-y-6 font-sans pb-16">
+
+      {/* Super Admin Scope Selector */}
+      {isSuperAdmin && restaurants.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl border border-amber-200/60 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-amber-800 uppercase">Super Admin View Scope</p>
+              <h3 className="text-sm font-bold text-gray-900">Multi-Restaurant Categories Management</h3>
+            </div>
+          </div>
+          <div className="w-full sm:w-[360px] min-w-[360px]">
+            <Select
+              value={selectedRestaurant}
+              onValueChange={(val) => {
+                setSelectedRestaurant(val || "all");
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full h-11 bg-white border-amber-300 rounded-xl text-xs font-bold text-gray-900 shadow-xs focus:ring-amber-500">
+                <span className="truncate">
+                  {selectedRestaurant === "all"
+                    ? `🏢 All Restaurants (${restaurants.length} Outlets)`
+                    : `🏪 ${restaurants.find((r) => r.id === selectedRestaurant)?.name || "Selected Restaurant"}`}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="w-[360px] min-w-[360px] max-h-72 overflow-y-auto">
+                <SelectItem value="all" className="cursor-pointer font-bold text-xs py-2.5">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="truncate">🏢 All Restaurants (Platform Total)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 shrink-0">
+                      All Outlets
+                    </span>
+                  </div>
+                </SelectItem>
+                {restaurants.map((rest) => {
+                  const badgeClasses = getDietaryBadgeClasses(rest.dietaryCategory);
+                  const badgeLabel = getDietaryBadgeLabel(rest.dietaryCategory);
+
+                  return (
+                    <SelectItem key={rest.id} value={rest.id} className="cursor-pointer text-xs py-2.5">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{rest.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${badgeClasses}`}>
+                          {badgeLabel}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* Top 4 KPI Metrics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -559,26 +676,26 @@ export function CategoryList() {
               </Button>
 
               <div className="flex items-center gap-1 mx-1">
-                {getPageNumbers().map((p, idx) => {
-                  if (p === "...") {
+                {getPageNumbers().map((p) => {
+                  if (typeof p === "string") {
                     return (
-                      <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400">
+                      <span key={p} className="px-2 text-xs text-gray-400">
                         ...
                       </span>
                     );
                   }
-                  const pageNum = Number(p);
-                  const isCurrent = pageNum === safeCurrentPage;
+                  const isCurrent = p === safeCurrentPage;
                   return (
-                    <button type="button"
-                      key={`page-${pageNum}`}
-                      onClick={() => setCurrentPage(pageNum)}
+                    <button
+                      type="button"
+                      key={`page-${p}`}
+                      onClick={() => setCurrentPage(p)}
                       className={`h-8 min-w-[32px] px-2 text-xs font-semibold rounded-lg transition-all ${isCurrent
                         ? "bg-culinary-primary text-white shadow-sm"
                         : "bg-white text-gray-700 hover:bg-gray-100 border border-gray-200"
                         }`}
                     >
-                      {pageNum}
+                      {p}
                     </button>
                   );
                 })}

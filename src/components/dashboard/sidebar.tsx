@@ -19,12 +19,14 @@ import {
   Settings,
   History,
   UtensilsCrossed,
+  Building2,
 } from "lucide-react";
 
 export const sidebarLinks = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "CASHIER"] },
-  { name: "Floor Operations", href: "/dashboard/floor", icon: UtensilsCrossed, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
-  { name: "Menu Management", href: "/dashboard/menu", icon: MenuSquare, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
+  { name: "All Restaurants", href: "/dashboard/restaurants", icon: Building2, roles: ["SUPER_ADMIN"] },
+  { name: "Floor Operations", href: "/dashboard/floor", icon: UtensilsCrossed, roles: ["OWNER", "MANAGER"] },
+  { name: "Menu Management", href: "/dashboard/menu", icon: MenuSquare, roles: ["OWNER", "MANAGER"] },
   { name: "Categories", href: "/dashboard/categories", icon: Folder, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Products", href: "/dashboard/products", icon: Package, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Tables", href: "/dashboard/tables", icon: Armchair, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER"] },
@@ -36,7 +38,7 @@ export const sidebarLinks = [
   { name: "Payments", href: "/dashboard/payments", icon: CreditCard, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "CASHIER"] },
   { name: "Reports", href: "/dashboard/reports", icon: BarChart3, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Staff Management", href: "/dashboard/staff", icon: Users, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
-  { name: "Restaurant", href: "/dashboard/restaurant", icon: Store, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
+  { name: "Restaurant Profile", href: "/dashboard/restaurant", icon: Store, roles: ["OWNER", "MANAGER"] },
   { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
 ];
 

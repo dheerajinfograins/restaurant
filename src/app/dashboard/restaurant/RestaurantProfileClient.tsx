@@ -22,7 +22,9 @@ import {
   UploadCloud,
   Loader2,
   Trash2,
-  Camera
+  Camera,
+  ShieldCheck,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +91,8 @@ interface RestaurantProfileFormData {
   state: string;
   country: string;
   pincode: string;
+  fssaiLicense: string;
+  dietaryCategory: "PURE_VEG" | "PURE_NON_VEG" | "BOTH";
   website: string;
   description: string;
   logo: string;
@@ -105,6 +109,8 @@ const DEFAULT_FORM_DATA: RestaurantProfileFormData = {
   state: "",
   country: "India",
   pincode: "",
+  fssaiLicense: "",
+  dietaryCategory: "BOTH",
   website: "",
   description: "",
   logo: "",
@@ -128,6 +134,8 @@ interface RestaurantProfileResponse {
   state?: string;
   country?: string;
   pincode?: string;
+  fssaiLicense?: string;
+  dietaryCategory?: "PURE_VEG" | "PURE_NON_VEG" | "BOTH";
   website?: string;
   description?: string;
   logo?: string;
@@ -146,6 +154,8 @@ function mapProfileToFormData(profile?: RestaurantProfileResponse | null): Resta
     state: profile.state || "",
     country: profile.country || "India",
     pincode: profile.pincode || "",
+    fssaiLicense: profile.fssaiLicense || "",
+    dietaryCategory: profile.dietaryCategory || "BOTH",
     website: profile.website || "",
     description: profile.description || "",
     logo: profile.logo || "",
@@ -540,6 +550,107 @@ export default function RestaurantProfileClient() {
                   placeholder="e.g. The Daily Grind & Gather"
                   className="rounded-xl border-gray-200 text-xs py-2.5"
                 />
+              </div>
+
+              {/* Dietary Classification Card (Locked to active restaurant type) */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-gray-700">Dietary Establishment Type</Label>
+                  <span className="text-[10px] text-gray-400">Determines menu permissions & kitchen badges</span>
+                </div>
+
+                {formData.dietaryCategory === "PURE_VEG" && (
+                  <div className="p-4 rounded-2xl border border-emerald-300 bg-gradient-to-r from-emerald-50 via-emerald-50/50 to-white text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                        🌱
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-xs text-emerald-950">100% Pure Vegetarian Establishment</h4>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-300">
+                            <ShieldCheck size={11} /> Verified Pure Veg
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-emerald-800/80 mt-0.5">
+                          Strictly vegetarian menu catalog. Non-vegetarian dishes are restricted across all order terminals.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700 bg-emerald-100/60 px-2.5 py-1 rounded-lg border border-emerald-200 self-start sm:self-center shrink-0">
+                      <Lock size={12} /> Policy Locked
+                    </div>
+                  </div>
+                )}
+
+                {formData.dietaryCategory === "PURE_NON_VEG" && (
+                  <div className="p-4 rounded-2xl border border-rose-300 bg-gradient-to-r from-rose-50 via-rose-50/50 to-white text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-rose-100 border border-rose-300 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                        🍗
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-xs text-rose-950">Pure Non-Vegetarian Establishment</h4>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-full border border-rose-300">
+                            <ShieldCheck size={11} /> Verified Non-Veg
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-rose-800/80 mt-0.5">
+                          Specialized meat, poultry & seafood cuisine catalog with dedicated non-vegetarian certifications.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-100/60 px-2.5 py-1 rounded-lg border border-rose-200 self-start sm:self-center shrink-0">
+                      <Lock size={12} /> Policy Locked
+                    </div>
+                  </div>
+                )}
+
+                {formData.dietaryCategory === "BOTH" && (
+                  <div className="p-4 rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-amber-50/50 to-white text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-11 h-11 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                        🥗🍗
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-xs text-amber-950">Multi-Cuisine Dining Establishment</h4>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-300">
+                            <ShieldCheck size={11} /> Verified Multi-Cuisine
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-amber-900/80 mt-0.5">
+                          Serves full-spectrum dining catalog featuring both Vegetarian and Non-Vegetarian culinary menus.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-100/60 px-2.5 py-1 rounded-lg border border-amber-200 self-start sm:self-center shrink-0">
+                      <Lock size={12} /> Policy Locked
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-gray-700">FSSAI / Food Safety License No.</Label>
+                  <Input
+                    value={formData.fssaiLicense}
+                    onChange={(e) => setFormData({ ...formData, fssaiLicense: e.target.value })}
+                    placeholder="e.g. 10019022009876"
+                    className="rounded-xl border-gray-200 text-xs py-2.5 font-mono"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-gray-700">Official Website</Label>
+                  <Input
+                    value={formData.website}
+                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                    placeholder="https://myrestaurant.com"
+                    className="rounded-xl border-gray-200 text-xs py-2.5"
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">

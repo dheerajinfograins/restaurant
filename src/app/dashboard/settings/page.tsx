@@ -16,7 +16,7 @@ export default function SettingsPage() {
           Settings & Configurations
         </h1>
         <p className="text-xs text-gray-500 mt-1">
-          Configure restaurant GST taxation, invoice formats, weekly opening hours, order kitchen rules, and QR menu customization.
+          Manage account security profile, credentials, and restaurant system configurations.
         </p>
       </div>
 

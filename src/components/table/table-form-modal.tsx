@@ -32,7 +32,7 @@ const tableSchema = z.object({
   status: z.enum(["AVAILABLE", "OCCUPIED", "RESERVED"]).default("AVAILABLE"),
 });
 
-type TableFormValues = z.infer<typeof tableSchema>;
+export type TableFormValues = z.infer<typeof tableSchema>;
 
 interface TableFormModalProps {
   readonly isOpen: boolean;

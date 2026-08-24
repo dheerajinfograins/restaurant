@@ -23,6 +23,12 @@ interface StaffCardItemProps {
   onDeleteStaff: (staff: Staff) => void;
 }
 
+function getDietaryBadgeText(dietaryCategory?: string) {
+  if (dietaryCategory === "PURE_VEG") return "🌱 Veg";
+  if (dietaryCategory === "PURE_NON_VEG") return "🍗 Non-Veg";
+  return "🥗 Multi";
+}
+
 function StaffCardItem({
   person,
   onToggleStatus,
@@ -69,6 +75,19 @@ function StaffCardItem({
             </span>
           )}
         </div>
+
+        {/* Restaurant Badge if assigned */}
+        {person.restaurant?.name && (
+          <div className="mb-3 px-2.5 py-1.5 bg-stone-50 rounded-xl border border-stone-200/80 text-[11px] font-semibold text-stone-800 flex items-center justify-between shadow-2xs">
+            <span className="truncate flex items-center gap-1">
+              <span>🏢</span>
+              <span className="truncate">{person.restaurant.name}</span>
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white border border-stone-200 text-stone-600 font-normal shrink-0">
+              {getDietaryBadgeText(person.restaurant.dietaryCategory)}
+            </span>
+          </div>
+        )}
 
         {/* Contact Info Pills */}
         <div className="space-y-2 mb-4 text-xs text-gray-600">

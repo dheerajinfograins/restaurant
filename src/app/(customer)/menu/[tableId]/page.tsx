@@ -119,7 +119,7 @@ export default async function MenuHomePage({
             {restaurant.name || "The Culinary Ledger"}
           </h1>
 
-          {/* Badges: Table Info & Live Status */}
+          {/* Badges: Table Info, Live Status & Dietary Badge */}
           <div className="flex items-center gap-2 flex-wrap justify-center mt-1">
             <div className="bg-amber-50 border border-amber-200/80 px-3.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
               <span className="text-xs text-amber-900 font-bold">Table {table.tableNumber}</span>
@@ -133,10 +133,25 @@ export default async function MenuHomePage({
               ) : null}
             </div>
 
-            <div className="bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-[11px] font-bold text-emerald-800">Digital Menu & Ordering</span>
-            </div>
+            {/* Verified Dietary Classification Badge */}
+            {restaurant.dietaryCategory === "PURE_VEG" && (
+              <div className="bg-emerald-50 border border-emerald-300 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs text-emerald-800 font-bold text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>🌱 100% Pure Veg</span>
+              </div>
+            )}
+            {restaurant.dietaryCategory === "PURE_NON_VEG" && (
+              <div className="bg-rose-50 border border-rose-300 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs text-rose-800 font-bold text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                <span>🍗 Non-Veg Specialist</span>
+              </div>
+            )}
+            {restaurant.dietaryCategory === "BOTH" && (
+              <div className="bg-amber-50 border border-amber-300 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-2xs text-amber-900 font-bold text-[11px]">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>🥗🍗 Multi-Cuisine</span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -146,6 +161,7 @@ export default async function MenuHomePage({
         <ProductListClient
           products={products}
           settings={settings}
+          dietaryCategory={restaurant.dietaryCategory}
         />
       </div>
     </div>

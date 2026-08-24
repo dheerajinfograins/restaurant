@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 
+import { copyToClipboard } from "@/lib/utils";
+
 interface TableQrModalProps {
   readonly table: (RestaurantTable & { restaurant?: { name?: string; logo?: string | null } }) | null;
   readonly isOpen: boolean;
@@ -46,15 +48,10 @@ export default function TableQrModal({ table, isOpen, onClose, restaurantName: p
     }/menu/${table.id}`;
 
   const handleCopyLink = async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(targetUrl);
-        toast.success("Table digital menu link copied!");
-      } else {
-        throw new Error("Clipboard API is not supported in this environment");
-      }
-    } catch (err) {
-      console.error("Failed to copy link:", err);
+    const ok = await copyToClipboard(targetUrl);
+    if (ok) {
+      toast.success("Table digital menu link copied!");
+    } else {
       toast.error("Could not copy link to clipboard");
     }
   };

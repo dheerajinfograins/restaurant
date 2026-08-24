@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from "react";
 import {
   Bell,
   CheckCheck,
@@ -31,6 +31,8 @@ import NotificationDetailModal, {
 } from "./NotificationDetailModal";
 
 const STORAGE_KEY = "restaurant_notifications_history_v2";
+
+const emptySubscribe = () => () => {};
 
 type FilterTab = "ALL" | "UNREAD" | "ORDERS" | "ALERTS";
 
@@ -203,6 +205,84 @@ function buildInitialOrderNotification(
   };
 }
 
+function isStoredNotificationDuplicate(
+  existing: AppNotification,
+  candidate: AppNotification
+): boolean {
+  if (existing.id === candidate.id) return true;
+
+  if (
+    existing.metadata?.orderId &&
+    candidate.metadata?.orderId &&
+    existing.metadata.orderId === candidate.metadata.orderId &&
+    existing.type === candidate.type
+  ) {
+    return true;
+  }
+
+  const isSameContent =
+    existing.type === candidate.type &&
+    existing.title === candidate.title &&
+    existing.message === candidate.message;
+
+  if (isSameContent) {
+    const timeDiff = Math.abs(
+      new Date(existing.timestamp).getTime() -
+        new Date(candidate.timestamp).getTime()
+    );
+    return timeDiff < 30000;
+  }
+
+  return false;
+}
+
+function getStoredNotifications(): AppNotification[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return [];
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+
+    const unique: AppNotification[] = [];
+    for (const item of parsed) {
+      const isDup = unique.some((u) => isStoredNotificationDuplicate(u, item));
+      if (!isDup) {
+        unique.push(item);
+      }
+    }
+    return unique;
+  } catch {
+    return [];
+  }
+}
+
+async function fetchInitialOrderNotifications(
+  localNotifs: AppNotification[]
+): Promise<AppNotification[]> {
+  try {
+    const res = await fetch("/api/orders");
+    if (!res.ok) return localNotifs;
+
+    const orders = (await res.json()) as OrderPayload[];
+    if (!Array.isArray(orders) || orders.length === 0) return localNotifs;
+
+    const converted = createInitialOrderNotifications(orders, localNotifs);
+    if (converted.length === 0) return localNotifs;
+
+    const combined = [...localNotifs, ...converted].sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+    const updated = combined.slice(0, 100);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return updated;
+  } catch (err) {
+    console.error("Failed to load initial order notifications:", err);
+    return localNotifs;
+  }
+}
+
 function createInitialOrderNotifications(
   orders: OrderPayload[],
   existingList: AppNotification[]
@@ -231,40 +311,12 @@ function createInitialOrderNotifications(
 
 export default function NotificationBellDropdown() {
   const { socket } = useSocket();
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Clean up existing duplicates from storage
-          const unique: AppNotification[] = [];
-          for (const item of parsed) {
-            const isDup = unique.some(
-              (u) =>
-                u.id === item.id ||
-                (u.type === item.type &&
-                  u.title === item.title &&
-                  u.message === item.message &&
-                  Math.abs(new Date(u.timestamp).getTime() - new Date(item.timestamp).getTime()) < 30000) ||
-                (Boolean(u.metadata?.orderId) &&
-                  Boolean(item.metadata?.orderId) &&
-                  u.metadata?.orderId === item.metadata?.orderId &&
-                  u.type === item.type)
-            );
-            if (!isDup) {
-              unique.push(item);
-            }
-          }
-          return unique;
-        }
-      }
-    } catch {
-      // fallback
-    }
-    return [];
-  });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const isMounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [selectedNotification, setSelectedNotification] =
@@ -272,34 +324,24 @@ export default function NotificationBellDropdown() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // Fetch initial orders on mount to ensure recent notifications exist
+  // Initialize notifications from localStorage and backfill recent orders
   useEffect(() => {
-    const fetchRecentOrders = async () => {
-      try {
-        const res = await fetch("/api/orders");
-        if (!res.ok) return;
-        const orders = (await res.json()) as OrderPayload[];
-        if (Array.isArray(orders) && orders.length > 0) {
-          setNotifications((prev) => {
-            const converted = createInitialOrderNotifications(orders, prev);
-            if (converted.length === 0) return prev;
+    let ignore = false;
 
-            const combined = [...prev, ...converted].sort(
-              (a, b) =>
-                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            );
+    const initializeNotifications = async () => {
+      const localNotifs = getStoredNotifications();
+      const updatedNotifs = await fetchInitialOrderNotifications(localNotifs);
 
-            const limited = combined.slice(0, 100);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(limited));
-            return limited;
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load initial order notifications:", err);
+      if (!ignore) {
+        setNotifications(updatedNotifs);
       }
     };
 
-    void fetchRecentOrders();
+    void initializeNotifications();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   // Save to localStorage whenever notifications change
@@ -562,8 +604,8 @@ export default function NotificationBellDropdown() {
   }, [socket, addNotification]);
 
   const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
+    () => (isMounted ? notifications.filter((n) => !n.isRead).length : 0),
+    [notifications, isMounted]
   );
 
   const filteredNotifications = useMemo(() => {

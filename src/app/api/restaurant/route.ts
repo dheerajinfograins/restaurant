@@ -2,22 +2,21 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
-import { requireRoles } from "@/lib/permissions";
+import { getAuthenticatedRestaurantId } from "@/lib/permissions";
 import { AppError, HTTP_STATUS } from "@/exceptions";
-import { Prisma } from "@prisma/client";
+import { DietaryCategory, Prisma } from "@prisma/client";
 import { deleteImageFromCloudinary, uploadImageToCloudinary } from "@/lib/cloudinary";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-    
-    let restaurantId = payload.restaurantId;
-    if (!restaurantId) {
-      const firstRestaurant = await prisma.restaurant.findFirst();
-      if (!firstRestaurant) {
-        throw new AppError("No restaurant found. Please create a restaurant first.", HTTP_STATUS.NOT_FOUND);
-      }
-      restaurantId = firstRestaurant.id;
+    const { searchParams } = new URL(request.url);
+    const requestedRestId = searchParams.get("restaurantId");
+
+    let restaurantId = "";
+    if (requestedRestId && requestedRestId !== "all") {
+      restaurantId = requestedRestId;
+    } else {
+      restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
     }
 
     const restaurant = await prisma.restaurant.findUnique({
@@ -43,6 +42,7 @@ const TEXT_FIELDS = [
   "state",
   "country",
   "pincode",
+  "fssaiLicense",
   "website",
   "description",
 ] as const;
@@ -56,6 +56,12 @@ function extractUpdateFields(body: Record<string, unknown>): Prisma.RestaurantUp
   }
   if (body.isActive !== undefined) {
     data.isActive = body.isActive as boolean;
+  }
+  if (body.dietaryCategory !== undefined) {
+    const valid: readonly DietaryCategory[] = ["PURE_VEG", "PURE_NON_VEG", "BOTH"];
+    if (valid.includes(body.dietaryCategory as DietaryCategory)) {
+      data.dietaryCategory = body.dietaryCategory as DietaryCategory;
+    }
   }
   return data;
 }
@@ -88,16 +94,7 @@ async function processImage(
 
 export async function PATCH(request: NextRequest) {
   try {
-    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-
-    let restaurantId = payload.restaurantId;
-    if (!restaurantId) {
-      const firstRestaurant = await prisma.restaurant.findFirst();
-      if (!firstRestaurant) {
-        throw new AppError("No restaurant found to update", HTTP_STATUS.NOT_FOUND);
-      }
-      restaurantId = firstRestaurant.id;
-    }
+    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
 
     const currentRestaurant = await prisma.restaurant.findUnique({
       where: { id: restaurantId }

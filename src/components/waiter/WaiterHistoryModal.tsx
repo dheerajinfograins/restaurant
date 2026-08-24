@@ -82,55 +82,48 @@ export function WaiterHistoryModal({
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("ALL");
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
-  const fetchHistory = useCallback(async () => {
+  const loadHistoryData = useCallback(async () => {
     try {
-      const res = await fetch(`/api/waiter/orders?status=HISTORY&t=${Date.now()}`);
+      const waiterQuery = waiterId ? `&waiterId=${encodeURIComponent(waiterId)}` : "";
+      const res = await fetch(`/api/waiter/orders?status=HISTORY${waiterQuery}&t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
-        setOrders(data);
+        return data as HistoryOrder[];
       }
     } catch (err) {
       console.error("Failed to fetch waiter history:", err);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+    return null;
+  }, [waiterId]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     let ignore = false;
 
-    async function loadModalHistory() {
-      try {
-        const res = await fetch(`/api/waiter/orders?status=HISTORY&t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!ignore) {
-            setOrders(data);
-          }
+    async function load() {
+      const data = await loadHistoryData();
+      if (!ignore) {
+        if (data) {
+          setOrders(data);
         }
-      } catch (err) {
-        if (!ignore) {
-          console.error("Failed to fetch waiter history:", err);
-        }
-      } finally {
-        if (!ignore) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
     }
 
-    void loadModalHistory();
+    void load();
 
     return () => {
       ignore = true;
     };
-  }, [isOpen]);
+  }, [isOpen, loadHistoryData]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchHistory();
+    const data = await loadHistoryData();
+    if (data) {
+      setOrders(data);
+    }
     setIsRefreshing(false);
     toast.success("History refreshed", { id: "refresh-history-modal" });
   };
@@ -141,8 +134,8 @@ export function WaiterHistoryModal({
     const now = new Date();
 
     return orders.filter((order) => {
-      // Filter by current waiter if waiterId is available
-      if (waiterId && order.waiterId && order.waiterId !== waiterId) {
+      // Strictly filter by current waiter if waiterId is available
+      if (waiterId && order.waiterId !== waiterId) {
         return false;
       }
 

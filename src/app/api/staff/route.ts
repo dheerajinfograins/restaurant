@@ -3,23 +3,39 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { successResponse } from "@/lib/api-response";
-import { getAuthenticatedRestaurantId } from "@/lib/permissions";
+import { requireRoles, getAuthenticatedRestaurantId } from "@/lib/permissions";
 import bcrypt from "bcrypt";
 import { NextRequest } from "next/server";
-import { UserRole } from "@prisma/client";
+import { UserRole, Prisma } from "@prisma/client";
 
-// GET /api/staff - Fetch all staff for the restaurant
-export async function GET() {
+// GET /api/staff - Fetch all staff for the restaurant (or across restaurants for Super Admin)
+export async function GET(request: NextRequest) {
   try {
-    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const isSuperAdmin = payload.role === "SUPER_ADMIN";
+
+    const { searchParams } = new URL(request.url);
+    const requestedRestId = searchParams.get("restaurantId");
+
+    const whereClause: Prisma.UserWhereInput = {};
+    let restaurantsList: Array<{ id: string; name: string; dietaryCategory: string }> = [];
+
+    if (isSuperAdmin) {
+      restaurantsList = await prisma.restaurant.findMany({
+        select: { id: true, name: true, dietaryCategory: true },
+        orderBy: { name: "asc" },
+      });
+
+      if (requestedRestId && requestedRestId !== "all") {
+        whereClause.restaurantId = requestedRestId;
+      }
+    } else {
+      const restaurantId = payload.restaurantId || (await getAuthenticatedRestaurantId(["OWNER", "MANAGER"]));
+      whereClause.restaurantId = restaurantId;
+    }
 
     const staff = await prisma.user.findMany({
-      where: {
-        OR: [
-          { restaurantId },
-          { restaurantId: null },
-        ],
-      },
+      where: whereClause,
       select: {
         id: true,
         name: true,
@@ -28,6 +44,10 @@ export async function GET() {
         role: true,
         isActive: true,
         createdAt: true,
+        restaurantId: true,
+        restaurant: {
+          select: { id: true, name: true, dietaryCategory: true },
+        },
         _count: {
           select: { orders: true },
         },
@@ -35,7 +55,11 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    return successResponse("Staff fetched successfully", staff);
+    return successResponse("Staff fetched successfully", {
+      staff,
+      restaurants: restaurantsList,
+      isSuperAdmin,
+    });
   } catch (error) {
     return handleError(error);
   }
@@ -44,10 +68,16 @@ export async function GET() {
 // POST /api/staff - Create new staff member
 export async function POST(request: NextRequest) {
   try {
-    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
     const body = await request.json();
     const { name, email, phone, password, role, isActive } = body;
+
+    let restaurantId = "";
+    if (payload.role === "SUPER_ADMIN") {
+      restaurantId = body.restaurantId || (await getAuthenticatedRestaurantId());
+    } else {
+      restaurantId = payload.restaurantId || (await getAuthenticatedRestaurantId(["OWNER", "MANAGER"]));
+    }
 
     if (!name || typeof name !== "string" || !name.trim()) {
       throw new AppError("Staff name is required", HTTP_STATUS.BAD_REQUEST);

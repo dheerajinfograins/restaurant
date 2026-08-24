@@ -199,7 +199,7 @@ export function AllTablesTurnoverModal({
 
             return (
               <div
-                key={table.name}
+                key={`${table.name}-${globalIndex}`}
                 className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-200/90 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all space-y-3 relative overflow-hidden flex flex-col justify-between"
               >
                 {/* Header */}
@@ -278,7 +278,7 @@ export function AllTablesTurnoverModal({
                 const revenueShare = totalRevenue > 0 ? (table.revenue / totalRevenue) * 100 : 0;
 
                 return (
-                  <tr key={table.name} className="hover:bg-emerald-50/30 transition-colors">
+                  <tr key={`${table.name}-${globalIndex}`} className="hover:bg-emerald-50/30 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-gray-500">
                       #{globalIndex + 1}
                     </td>

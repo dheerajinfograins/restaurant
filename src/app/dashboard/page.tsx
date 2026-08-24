@@ -12,20 +12,25 @@ import {
   Armchair,
   Users,
   Clock,
-
   Utensils,
   ArrowRight,
   TrendingUp,
   RotateCw,
-
   ChefHat,
   QrCode,
   Store,
   Check,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 
 
 const AMBIANCE_PRESETS = [
@@ -50,6 +55,50 @@ const AMBIANCE_PRESETS = [
     url: "https://images.unsplash.com/photo-1514933651103-005eec06c04b?w=1600&q=80",
   },
 ];
+
+const DIETARY_BADGE_CONFIG: Record<string, { label: string; className: string }> = {
+  PURE_VEG: {
+    label: "Veg",
+    className: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+  },
+  PURE_NON_VEG: {
+    label: "Non-Veg",
+    className: "bg-rose-50 text-rose-700 border border-rose-200",
+  },
+};
+
+const DEFAULT_DIETARY_BADGE = {
+  label: "Multi-Cuisine",
+  className: "bg-amber-50 text-amber-700 border border-amber-200",
+};
+
+function getDietaryBadge(category?: string) {
+  if (category && category in DIETARY_BADGE_CONFIG) {
+    return DIETARY_BADGE_CONFIG[category];
+  }
+  return DEFAULT_DIETARY_BADGE;
+}
+
+const RANK_STYLES: Record<number, string> = {
+  0: "bg-amber-100 text-amber-900 border-amber-300",
+  1: "bg-slate-200 text-slate-800 border-slate-300",
+  2: "bg-amber-700/10 text-amber-900 border-amber-600/30",
+};
+const DEFAULT_RANK_STYLE = "bg-white text-gray-600 border-gray-200";
+
+const RANK_BADGES: Record<number, string> = {
+  0: "🥇",
+  1: "🥈",
+  2: "🥉",
+};
+
+function getRankBadge(idx: number): string | number {
+  return RANK_BADGES[idx] ?? idx + 1;
+}
+
+function getRankStyle(idx: number): string {
+  return RANK_STYLES[idx] ?? DEFAULT_RANK_STYLE;
+}
 
 interface RestaurantProfile {
   id?: string;
@@ -77,6 +126,7 @@ interface DashboardMetrics {
 interface DashboardRecentOrder {
   id: string;
   tableNumber: string | number;
+  restaurantName?: string;
   totalAmount: number;
   status: string;
   paymentMethod: string;
@@ -94,6 +144,8 @@ interface TopDish {
 }
 
 interface DashboardData {
+  isSuperAdmin?: boolean;
+  restaurants?: Array<{ id: string; name: string; dietaryCategory: string }>;
   restaurant: RestaurantProfile;
   metrics: DashboardMetrics;
   recentOrders: DashboardRecentOrder[];
@@ -105,22 +157,28 @@ interface DashboardData {
 
 export default function DashboardHome() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isUpdatingCover, setIsUpdatingCover] = useState(false);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
+  const fetchDashboardData = async (restId?: string) => {
     try {
-      const res = await axios.get(`/api/dashboard?t=${Date.now()}`);
+      const activeRest = restId ?? selectedRestaurant;
+      const query = activeRest && activeRest !== "all" ? `?restaurantId=${activeRest}&t=${Date.now()}` : `?t=${Date.now()}`;
+      const res = await axios.get(`/api/dashboard${query}`);
       setData(res.data.data);
     } catch (e) {
       console.error("Dashboard fetch error:", e);
       toast.error("Failed to load dashboard data");
-    } finally {
-      setIsRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchDashboardData();
+    setIsRefreshing(false);
   };
 
   useEffect(() => {
@@ -128,7 +186,10 @@ export default function DashboardHome() {
 
     async function loadDashboard() {
       try {
-        const res = await axios.get(`/api/dashboard?t=${Date.now()}`);
+        const query = selectedRestaurant && selectedRestaurant !== "all"
+          ? `?restaurantId=${selectedRestaurant}&t=${Date.now()}`
+          : `?t=${Date.now()}`;
+        const res = await axios.get(`/api/dashboard${query}`);
         if (!ignore) {
           setData(res.data.data);
         }
@@ -149,7 +210,7 @@ export default function DashboardHome() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [selectedRestaurant]);
 
   // Master Dining Open/Closed Switch
   const handleToggleDiningStatus = async (isActive: boolean) => {
@@ -256,6 +317,58 @@ export default function DashboardHome() {
 
   return (
     <div className="space-y-6 font-sans pb-16 animate-in fade-in duration-500">
+
+      {/* ===================== SUPER ADMIN SCOPE SELECTOR ===================== */}
+      {data?.isSuperAdmin && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent rounded-2xl border border-amber-200/60 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-300 flex items-center justify-center text-amber-700 shadow-xs">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-wider text-amber-800 uppercase">Super Admin View Scope</p>
+              <h2 className="text-sm font-bold text-gray-900">Platform Executive Live Control</h2>
+            </div>
+          </div>
+          <div className="w-full sm:w-[360px] min-w-[360px]">
+            <Select
+              value={selectedRestaurant}
+              onValueChange={(val) => setSelectedRestaurant(val || "all")}
+            >
+              <SelectTrigger className="w-full h-11 bg-white border-amber-300 rounded-xl text-xs font-bold text-gray-900 shadow-xs focus:ring-amber-500">
+                <span className="truncate">
+                  {selectedRestaurant === "all"
+                    ? `🏢 All Restaurants (${data?.restaurants?.length || 0} Outlets Aggregate)`
+                    : `🏪 ${data?.restaurants?.find((r) => r.id === selectedRestaurant)?.name || "Selected Restaurant"}`}
+                </span>
+              </SelectTrigger>
+              <SelectContent className="w-[360px] min-w-[360px] max-h-72 overflow-y-auto">
+                <SelectItem value="all" className="cursor-pointer font-bold text-xs py-2.5">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="truncate">🏢 All Restaurants (Platform Total)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 shrink-0">
+                      Platform Wide
+                    </span>
+                  </div>
+                </SelectItem>
+                {(data?.restaurants || []).map((rest) => {
+                  const badge = getDietaryBadge(rest.dietaryCategory);
+                  return (
+                    <SelectItem key={rest.id} value={rest.id} className="cursor-pointer text-xs py-2.5">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{rest.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
 
       {/* ===================== LUXURY HERO AMBIANCE COVER BANNER ===================== */}
       <div className="relative rounded-3xl overflow-hidden shadow-md border border-amber-900/10 min-h-[220px] md:min-h-[240px] flex flex-col justify-between p-6 md:p-8 bg-gray-900 text-white">
@@ -492,10 +605,15 @@ export default function DashboardHome() {
                         T{order.tableNumber}
                       </div>
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-bold text-xs text-gray-900 font-cormorant text-base">
                             Table {order.tableNumber}
                           </span>
+                          {order.restaurantName && (
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                              🏢 {order.restaurantName}
+                            </span>
+                          )}
                           <span className="text-[10px] text-gray-400 font-mono">
                             ID: {order.id.slice(-6)}
                           </span>
@@ -608,7 +726,6 @@ export default function DashboardHome() {
                   data?.topDishes?.slice(0, 5).map((dish, idx: number) => {
                     const topRevenue = data?.topDishes?.[0]?.revenue || 1;
                     const share = (dish.revenue / topRevenue) * 100;
-                    const isTopThree = idx < 3;
 
                     return (
                       <div
@@ -617,17 +734,9 @@ export default function DashboardHome() {
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span
-                            className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center shrink-0 border ${
-                              idx === 0
-                                ? "bg-amber-100 text-amber-900 border-amber-300"
-                                : idx === 1
-                                ? "bg-slate-200 text-slate-800 border-slate-300"
-                                : idx === 2
-                                ? "bg-amber-700/10 text-amber-900 border-amber-600/30"
-                                : "bg-white text-gray-600 border-gray-200"
-                            }`}
+                            className={`w-6 h-6 rounded-lg font-bold text-[10px] flex items-center justify-center shrink-0 border ${getRankStyle(idx)}`}
                           >
-                            {isTopThree ? (idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉") : idx + 1}
+                            {getRankBadge(idx)}
                           </span>
                           <div className="truncate">
                             <p className="font-bold text-gray-900 truncate" title={dish.name}>

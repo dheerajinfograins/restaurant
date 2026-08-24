@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { successResponse } from "@/lib/api-response";
-import { getAuthenticatedRestaurantId } from "@/lib/permissions";
+import { requireRoles, getAuthenticatedRestaurantId } from "@/lib/permissions";
 import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 
@@ -16,12 +16,17 @@ interface StaffUpdateBody {
   isActive?: unknown;
 }
 
-async function getStaffUser(id: string, restaurantId: string, forbiddenMessage = "Forbidden") {
+async function getStaffUser(
+  id: string,
+  restaurantId: string,
+  isSuperAdmin = false,
+  forbiddenMessage = "Forbidden"
+) {
   const existingUser = await prisma.user.findUnique({ where: { id } });
   if (!existingUser) {
     throw new AppError("User not found", HTTP_STATUS.NOT_FOUND);
   }
-  if (existingUser.restaurantId && existingUser.restaurantId !== restaurantId) {
+  if (!isSuperAdmin && existingUser.restaurantId && existingUser.restaurantId !== restaurantId) {
     throw new AppError(forbiddenMessage, HTTP_STATUS.FORBIDDEN);
   }
   return existingUser;
@@ -143,12 +148,15 @@ function emitStaffStatus(
 // PUT /api/staff/[id] - Update staff details
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const isSuperAdmin = payload.role === "SUPER_ADMIN";
+    const restaurantId = payload.restaurantId || (await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]));
     const { id } = await params;
 
     const existingUser = await getStaffUser(
       id,
       restaurantId,
+      isSuperAdmin,
       "Forbidden: Cannot edit users outside your restaurant"
     );
 
@@ -182,10 +190,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 // PATCH /api/staff/[id] - Toggle staff active status
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const isSuperAdmin = payload.role === "SUPER_ADMIN";
+    const restaurantId = payload.restaurantId || (await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]));
     const { id } = await params;
 
-    await getStaffUser(id, restaurantId);
+    await getStaffUser(id, restaurantId, isSuperAdmin);
 
     const body = await request.json();
     if (typeof body.isActive !== "boolean") {
@@ -219,10 +229,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 // DELETE /api/staff/[id] - Delete staff permanently
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
+    const isSuperAdmin = payload.role === "SUPER_ADMIN";
+    const restaurantId = payload.restaurantId || (await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]));
     const { id } = await params;
 
-    await getStaffUser(id, restaurantId);
+    await getStaffUser(id, restaurantId, isSuperAdmin);
 
     const ordersCount = await prisma.order.count({
       where: {

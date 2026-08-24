@@ -2,20 +2,16 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { handleError } from "@/helpers/error-handler";
 import { successResponse } from "@/lib/api-response";
-import { requireRoles } from "@/lib/permissions";
+import { getAuthenticatedRestaurantId } from "@/lib/permissions";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { deleteImageFromCloudinary, uploadImageToCloudinary } from "@/lib/cloudinary";
 
 export async function PATCH(request: NextRequest) {
   try {
-    const payload = await requireRoles(["SUPER_ADMIN", "OWNER", "MANAGER"]);
-    
-    if (!payload.restaurantId) {
-      throw new AppError("Restaurant ID is required", HTTP_STATUS.BAD_REQUEST);
-    }
+    const restaurantId = await getAuthenticatedRestaurantId(["SUPER_ADMIN", "OWNER", "MANAGER"]);
 
     const currentRestaurant = await prisma.restaurant.findUnique({
-      where: { id: payload.restaurantId }
+      where: { id: restaurantId }
     });
 
     if (!currentRestaurant) {
@@ -23,7 +19,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
-    
+
     // Whitelist allowed fields to update on Restaurant
     const { name, phone, email, address, city, state, pincode, website, logo } = body;
 
@@ -42,7 +38,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updatedRestaurant = await prisma.restaurant.update({
-      where: { id: payload.restaurantId },
+      where: { id: restaurantId },
       data: {
         name,
         phone,
