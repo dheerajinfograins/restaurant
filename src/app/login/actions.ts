@@ -26,7 +26,9 @@ export async function loginAction(formData: FormData) {
       path: "/",
     });
 
-    if (result.user.role === "WAITER") {
+    if (result.user.role === "SUPER_ADMIN") {
+      redirectUrl = "/dashboard/restaurants";
+    } else if (result.user.role === "WAITER") {
       redirectUrl = "/waiter";
     } else if (result.user.role === "KITCHEN") {
       redirectUrl = "/dashboard/kitchen";

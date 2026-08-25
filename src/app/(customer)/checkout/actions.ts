@@ -14,6 +14,9 @@ export async function createOrderAction(data: {
   notes?: string;
   items: { id: string; quantity: number; price: number }[];
   totalAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
+  couponId?: string;
   status?: OrderStatus;
   paymentMethod?: PaymentMethod;
 }) {
@@ -29,6 +32,9 @@ export async function createOrderAction(data: {
         customerPhone: data.customerPhone,
         notes: data.notes,
         totalAmount: data.totalAmount,
+        discountAmount: data.discountAmount ?? 0,
+        couponCode: data.couponCode || null,
+        couponId: data.couponId || null,
         status: data.status || OrderStatus.PENDING,
         paymentMethod: data.paymentMethod || null,
         items: {
@@ -49,6 +55,14 @@ export async function createOrderAction(data: {
         table: true,
       },
     });
+
+    // Increment coupon usedCount if applied
+    if (data.couponId) {
+      await prisma.coupon.update({
+        where: { id: data.couponId },
+        data: { usedCount: { increment: 1 } },
+      }).catch((err) => console.error("Failed to increment coupon count:", err));
+    }
 
     // Broadcast live to Admin, Kitchen, Waiter via Socket.io
     // @ts-expect-error - global.io is set in server.ts
@@ -123,6 +137,9 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
   notes?: string;
   items: { id: string; quantity: number; price: number }[];
   totalAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
+  couponId?: string;
   paymentMethod: PaymentMethod;
 }) {
   try {
@@ -140,8 +157,11 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
       };
     }
 
-    // 2. Build Notes with Razorpay Payment Trace
-    const paymentAuditNote = `[Razorpay Paid: ${data.razorpayPaymentId}]`;
+    // 2. Build Notes with Razorpay Payment Trace & Coupon
+    let paymentAuditNote = `[Razorpay Paid: ${data.razorpayPaymentId}]`;
+    if (data.couponCode) {
+      paymentAuditNote += ` [Coupon Applied: ${data.couponCode} (-₹${(data.discountAmount || 0).toFixed(2)})]`;
+    }
     const finalNotes = data.notes
       ? `${data.notes} | ${paymentAuditNote}`
       : paymentAuditNote;
@@ -158,6 +178,9 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
         customerPhone: data.customerPhone,
         notes: finalNotes,
         totalAmount: data.totalAmount,
+        discountAmount: data.discountAmount ?? 0,
+        couponCode: data.couponCode || null,
+        couponId: data.couponId || null,
         status: OrderStatus.PENDING,
         paymentMethod: data.paymentMethod,
         items: {
@@ -178,6 +201,14 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
         table: true,
       },
     });
+
+    // Increment coupon usage
+    if (data.couponId) {
+      await prisma.coupon.update({
+        where: { id: data.couponId },
+        data: { usedCount: { increment: 1 } },
+      }).catch((err) => console.error("Failed to increment coupon count:", err));
+    }
 
     // 4. Broadcast live via Socket.io
     // @ts-expect-error - global.io is set in server.ts

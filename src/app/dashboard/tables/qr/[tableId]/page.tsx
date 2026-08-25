@@ -21,7 +21,7 @@ export default function QrPreviewPage({ params }: Readonly<{ params: Promise<{ t
   const origin = useSyncExternalStore(
     () => () => {},
     () => window.location.origin,
-    () => process.env.NEXT_PUBLIC_APP_URL || "https://localhost:3000"
+    () => process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
   );
 
   useEffect(() => {

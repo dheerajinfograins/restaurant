@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { loginAction } from "@/app/login/actions";
-import { Eye, EyeOff, Mail, Lock, Loader2, Sparkles, ShieldCheck, ArrowRight, UserCheck } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Loader2, Shield, ShieldCheck, ArrowRight } from "lucide-react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,7 +23,7 @@ import {
 const loginSchema = z.object({
   email: z
     .string()
-    .min(1, { message: "Email address or Staff ID is required" })
+    .min(1, { message: "Email address or Admin ID is required" })
     .transform((val) => val.trim().toLowerCase())
     .refine(
       (val) => {
@@ -32,7 +32,7 @@ const loginSchema = z.object({
         const isStaffId = /^[a-zA-Z0-9_.-]{3,30}$/.test(val);
         return isEmail || isPhone || isStaffId;
       },
-      { message: "Please enter a valid email (e.g. admin@restaurant.com) or Staff ID" }
+      { message: "Please enter a valid email (e.g. admin@restaurant.com) or Admin ID" }
     ),
   password: z
     .string()
@@ -122,7 +122,6 @@ export default function LoginForm({
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeDemoRole, setActiveDemoRole] = useState<string | null>(null);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -143,12 +142,6 @@ export default function LoginForm({
   const hasLowercase = /[a-z]/.test(watchedPassword);
   const hasMixedNumberOrSymbol = /[0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(watchedPassword);
   const hasMinLength = watchedPassword.length >= 6;
-
-  const handleQuickRoleSelect = (roleName: string, email: string) => {
-    setActiveDemoRole(roleName);
-    form.setValue("email", email, { shouldValidate: true });
-    toast.success(`Selected ${roleName} login (${email})`, { id: "quick-role" });
-  };
 
   async function onSubmit(data: LoginFormValues) {
     setIsLoading(true);
@@ -175,9 +168,9 @@ export default function LoginForm({
   }
 
   const handleForgotPassword = () => {
-    toast("Please contact your Restaurant Administrator to reset credentials.", {
+    toast("Please contact Central System Architecture Support for Super Admin credential recovery.", {
       icon: "🔒",
-      duration: 4000,
+      duration: 4500,
     });
   };
 
@@ -201,70 +194,22 @@ export default function LoginForm({
           {brandName}
         </h1>
         <p className="text-[11px] text-amber-800 font-medium">
-          Enterprise Restaurant Management
+          Super Admin & Multi-Tenant Portal
         </p>
       </div>
 
       {/* Main Title & Subtitle */}
       <div className="mb-6 text-center lg:text-left">
         <div className="hidden lg:flex items-center gap-1.5 text-amber-700 text-xs font-bold uppercase tracking-wider mb-1">
-          <Sparkles size={13} />
-          <span>Staff & Management Portal</span>
+          <Shield size={13} />
+          <span>Super Admin Central Console</span>
         </div>
         <h2 className="text-3xl sm:text-4xl font-bold font-cormorant text-stone-900 tracking-tight leading-tight">
-          Welcome Back
+          Super Admin Portal
         </h2>
         <p className="mt-1 text-stone-500 text-xs sm:text-sm">
-          Sign in to access {brandName} floor operations, kitchen & billing.
+          Sign in to register restaurants, manage branch owners, and govern multi-tenant operations.
         </p>
-      </div>
-
-      {/* Quick Role Fill Pills for Fast Access */}
-      <div className="mb-5 p-2.5 bg-stone-50 rounded-2xl border border-stone-200/80">
-        <div className="flex items-center justify-between mb-1.5 px-0.5">
-          <span className="text-[10px] uppercase font-bold text-stone-500 tracking-wider flex items-center gap-1">
-            <UserCheck size={11} className="text-amber-700" />
-            Quick Demo Accounts
-          </span>
-          <span className="text-[10px] text-stone-400 font-medium">Click to fill</span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <button
-            type="button"
-            onClick={() => handleQuickRoleSelect("Admin", "admin@restaurant.com")}
-            className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all text-center ${
-              activeDemoRole === "Admin"
-                ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-            }`}
-          >
-            👑 Admin
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickRoleSelect("Waiter", "rampatidar@gmail.com")}
-            className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all text-center ${
-              activeDemoRole === "Waiter"
-                ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-            }`}
-          >
-            🍽️ Waiter
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickRoleSelect("Kitchen", "kitchen@restaurant.com")}
-            className={`px-2 py-1.5 rounded-xl text-[11px] font-bold border transition-all text-center ${
-              activeDemoRole === "Kitchen"
-                ? "bg-amber-600 text-white border-amber-600 shadow-2xs"
-                : "bg-white text-stone-700 border-stone-200 hover:bg-stone-100"
-            }`}
-          >
-            👨‍🍳 Kitchen
-          </button>
-        </div>
       </div>
 
       <Form {...form}>
@@ -275,15 +220,15 @@ export default function LoginForm({
             render={({ field }) => (
               <FormItem>
                 <div className="flex items-center justify-between">
-                  <FormLabel className="text-stone-700 font-bold text-xs">Email Address / Staff ID</FormLabel>
-                  <span className="text-[10px] text-stone-400">Email or Login ID</span>
+                  <FormLabel className="text-stone-700 font-bold text-xs">Super Admin Email / ID</FormLabel>
+                  <span className="text-[10px] text-stone-400">Admin Account</span>
                 </div>
                 <FormControl>
                   <div suppressHydrationWarning className="relative flex items-center">
                     <Mail className="absolute left-3.5 text-stone-400" size={17} />
                     <Input
                       suppressHydrationWarning
-                      placeholder="admin@restaurant.com or Staff ID"
+                      placeholder="admin@restaurant.com or Admin ID"
                       className="pl-10 h-11 bg-white border-stone-200 focus-visible:ring-amber-500/20 focus-visible:border-amber-600 rounded-xl text-xs sm:text-sm shadow-2xs transition-all selection:bg-amber-700 selection:text-white"
                       {...field}
                     />
@@ -309,7 +254,7 @@ export default function LoginForm({
                     <Input
                       suppressHydrationWarning
                       type={showPassword ? "text" : "password"}
-                      placeholder="e.g. Admin@123"
+                      placeholder="Enter Super Admin password"
                       className="pl-10 pr-10 h-11 bg-white border-stone-200 focus-visible:ring-amber-500/20 focus-visible:border-amber-600 rounded-xl text-xs sm:text-sm shadow-2xs transition-all selection:bg-amber-700 selection:text-white"
                       {...field}
                     />
@@ -352,7 +297,7 @@ export default function LoginForm({
                     />
                   </FormControl>
                   <FormLabel className="text-xs text-stone-600 font-normal cursor-pointer select-none">
-                    Remember this terminal
+                    Remember this workstation
                   </FormLabel>
                 </FormItem>
               )}
@@ -375,11 +320,11 @@ export default function LoginForm({
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin text-white" />
-                <span>Authenticating Portal...</span>
+                <span>Authenticating Console...</span>
               </>
             ) : (
               <>
-                <span>Sign In To Portal</span>
+                <span>Sign In To Super Admin Console</span>
                 <ArrowRight size={15} />
               </>
             )}
@@ -391,10 +336,11 @@ export default function LoginForm({
       <div className="mt-6 pt-4 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-400">
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={13} className="text-emerald-600" />
-          <span>256-Bit Encrypted • {brandName}</span>
+          <span>256-Bit Encrypted • Multi-Tenant Isolated</span>
         </div>
-        <span className="font-mono text-[10px]">v1.0.0</span>
+        <span className="font-mono text-[10px]">v1.0.0 Enterprise</span>
       </div>
     </div>
   );
 }
+

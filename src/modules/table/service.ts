@@ -30,8 +30,9 @@ class TableService {
     // Option A: Use the Table ID as the unique QR code identifier.
     // E.g. https://domain.com/menu/tableId
     // We'll pass the table.id in the URL
-    // We assume the frontend will be served from the NEXT_PUBLIC_APP_URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://localhost:3000";
+    const host = process.env.HOST || "localhost";
+    const port = process.env.PORT || "3000";
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `http://${host}:${port}`;
     const qrCodeUrl = `${appUrl}/menu/${table.id}`;
 
     return tableRepository.update(table.id, { qrCode: qrCodeUrl });

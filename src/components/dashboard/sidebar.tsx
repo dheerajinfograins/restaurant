@@ -20,6 +20,7 @@ import {
   History,
   UtensilsCrossed,
   Building2,
+  TicketPercent,
 } from "lucide-react";
 
 export const sidebarLinks = [
@@ -29,6 +30,7 @@ export const sidebarLinks = [
   { name: "Menu Management", href: "/dashboard/menu", icon: MenuSquare, roles: ["OWNER", "MANAGER"] },
   { name: "Categories", href: "/dashboard/categories", icon: Folder, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Products", href: "/dashboard/products", icon: Package, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
+  { name: "Coupons & Offers", href: "/dashboard/coupons", icon: TicketPercent, roles: ["SUPER_ADMIN", "OWNER", "MANAGER"] },
   { name: "Tables", href: "/dashboard/tables", icon: Armchair, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER"] },
   { name: "Orders", href: "/dashboard/orders", icon: Receipt, roles: ["SUPER_ADMIN", "OWNER", "MANAGER", "WAITER", "CASHIER"] },
   { name: "Kitchen Display", href: "/dashboard/kitchen", icon: MonitorPlay, roles: ["KITCHEN"] },

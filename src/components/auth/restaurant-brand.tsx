@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Sparkles, Utensils, ChefHat, Smartphone, ShieldCheck, Flame } from "lucide-react";
+import { Sparkles, Building2, UtensilsCrossed, BarChart3, ShieldCheck, Shield } from "lucide-react";
 
 interface RestaurantBrandProps {
   readonly restaurantName?: string;
@@ -21,7 +21,7 @@ export default function RestaurantBrand({
   return (
     <div className="hidden lg:flex flex-col justify-between p-12 xl:p-16 bg-gradient-to-br from-stone-950 via-neutral-900 to-amber-950 text-white relative overflow-hidden h-full border-r border-amber-500/10 select-none">
       {/* Ambient background image with luxury blend */}
-      <div className="absolute inset-0 opacity-25 mix-blend-luminosity pointer-events-none">
+      <div className="absolute inset-0 opacity-20 mix-blend-luminosity pointer-events-none">
         <Image
           src={coverSrc}
           alt={brandName}
@@ -53,7 +53,7 @@ export default function RestaurantBrand({
           <div>
             <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold uppercase tracking-widest">
               <Sparkles size={13} />
-              <span>Enterprise POS & Operations</span>
+              <span>Super Admin Command Portal</span>
             </div>
             <h1 className="text-3xl xl:text-4xl font-bold font-cormorant text-white tracking-tight leading-none mt-0.5">
               {brandName}
@@ -66,42 +66,30 @@ export default function RestaurantBrand({
       <div className="relative z-10 my-auto py-8 max-w-lg space-y-6">
         <div className="space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-medium backdrop-blur-xs">
-            <Flame size={13} className="text-amber-400" />
-            <span>Next-Gen Restaurant Management System</span>
+            <Shield size={13} className="text-amber-400" />
+            <span>Multi-Tenant Restaurant SaaS & Governance</span>
           </div>
 
           <h2 className="text-4xl xl:text-5xl font-bold font-cormorant text-white leading-[1.15] tracking-tight">
-            Every Great Meal Begins With Exceptional Management.
+            Register, Manage & Scale Modern Restaurant Networks.
           </h2>
 
           <p className="text-stone-300 text-sm xl:text-base leading-relaxed font-sans font-normal">
             {restaurantDescription ||
-              "Unified digital ecosystem orchestrating interactive dining floor tables, live kitchen display systems, fast billing, and handheld waitstaff operations."}
+              "Centralized super administration console to onboard dining establishments, configure dietary categories (Pure Veg, Non-Veg, Both), assign owner credentials, and oversee nationwide branch operations in real-time."}
           </p>
         </div>
 
-        {/* 4 Feature Highlights Grid */}
+        {/* 4 Feature Highlights Grid for Super Admin */}
         <div className="grid grid-cols-2 gap-3 pt-2">
           <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-amber-400/30 transition-all group">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 group-hover:bg-amber-500/30 transition-all shrink-0">
-                <Utensils size={16} />
+                <Building2 size={16} />
               </div>
               <div>
-                <p className="font-bold text-xs text-white">Live Floor POS</p>
-                <p className="text-[11px] text-stone-400">Interactive table sync</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-amber-400/30 transition-all group">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-orange-500/20 text-orange-400 group-hover:bg-orange-500/30 transition-all shrink-0">
-                <ChefHat size={16} />
-              </div>
-              <div>
-                <p className="font-bold text-xs text-white">Smart Kitchen KDS</p>
-                <p className="text-[11px] text-stone-400">Real-time prep routing</p>
+                <p className="font-bold text-xs text-white">Restaurant Onboarding</p>
+                <p className="text-[11px] text-stone-400">Instant registration & FSSAI</p>
               </div>
             </div>
           </div>
@@ -109,11 +97,11 @@ export default function RestaurantBrand({
           <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-amber-400/30 transition-all group">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/30 transition-all shrink-0">
-                <Smartphone size={16} />
+                <UtensilsCrossed size={16} />
               </div>
               <div>
-                <p className="font-bold text-xs text-white">Waitstaff Mobile</p>
-                <p className="text-[11px] text-stone-400">Fast table service</p>
+                <p className="font-bold text-xs text-white">Dietary Engine</p>
+                <p className="text-[11px] text-stone-400">Pure Veg, Non-Veg & Hybrid</p>
               </div>
             </div>
           </div>
@@ -121,11 +109,23 @@ export default function RestaurantBrand({
           <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-amber-400/30 transition-all group">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400 group-hover:bg-blue-500/30 transition-all shrink-0">
+                <BarChart3 size={16} />
+              </div>
+              <div>
+                <p className="font-bold text-xs text-white">Multi-Branch Analytics</p>
+                <p className="text-[11px] text-stone-400">Global revenue & order stats</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-amber-400/30 transition-all group">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-orange-500/20 text-orange-400 group-hover:bg-orange-500/30 transition-all shrink-0">
                 <ShieldCheck size={16} />
               </div>
               <div>
-                <p className="font-bold text-xs text-white">Instant Settlement</p>
-                <p className="text-[11px] text-stone-400">Cash, UPI & Card bills</p>
+                <p className="font-bold text-xs text-white">Tenant Security</p>
+                <p className="text-[11px] text-stone-400">Role-based access & isolation</p>
               </div>
             </div>
           </div>
@@ -136,10 +136,11 @@ export default function RestaurantBrand({
       <div className="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-stone-400">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping inline-block" />
-          <span className="text-stone-300 font-semibold">{brandName} Gateway</span>
+          <span className="text-stone-300 font-semibold">Multi-Tenant Gateway Engine</span>
         </div>
-        <span className="text-stone-400 font-mono text-[11px]">v1.0.0 • Active</span>
+        <span className="text-stone-400 font-mono text-[11px]">Super Admin v1.0.0 • Active</span>
       </div>
     </div>
   );
 }
+

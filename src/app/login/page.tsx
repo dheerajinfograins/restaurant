@@ -11,15 +11,15 @@ export async function generateMetadata(): Promise<Metadata> {
     });
     const name = restaurant?.name || "The Culinary Ledger";
     return {
-      title: `Sign In | ${name}`,
+      title: `Super Admin Sign In | ${name}`,
       description:
         restaurant?.description ||
-        `Sign in to manage ${name} operations, kitchen, and waitstaff.`,
+        `Super Admin console to register restaurants, manage branch owners, and govern multi-tenant operations.`,
     };
   } catch {
     return {
-      title: "Sign In | The Culinary Ledger",
-      description: "Sign in to manage your restaurant operations, kitchen, and waitstaff.",
+      title: "Super Admin Sign In | The Culinary Ledger",
+      description: "Super Admin console to register restaurants, manage branch owners, and govern multi-tenant operations.",
     };
   }
 }

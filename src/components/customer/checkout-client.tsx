@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import {
   ArrowLeft,
   FileText,
@@ -21,6 +22,10 @@ import {
   ArrowRight,
   ScanLine,
   Smartphone,
+  TicketPercent,
+  Tag,
+  Loader2,
+  Check,
 } from "lucide-react";
 import QRCode from "react-qr-code";
 import { useCartStore, type CartItem } from "@/store/cart-store";
@@ -31,6 +36,27 @@ import {
 } from "@/app/(customer)/checkout/actions";
 import type { PaymentMethod } from "@prisma/client";
 import toast from "react-hot-toast";
+
+export interface AppliedCouponInfo {
+  couponId: string;
+  code: string;
+  discountAmount: number;
+  discountType: "PERCENTAGE" | "FLAT";
+  discountValue: number;
+  couponType: string;
+  message: string;
+}
+
+export interface PublicCouponItem {
+  id: string;
+  code: string;
+  description?: string | null;
+  couponType: string;
+  discountType: string;
+  discountValue: number;
+  minOrderAmount?: number | null;
+  maxDiscount?: number | null;
+}
 
 interface RazorpayResponse {
   razorpay_payment_id: string;
@@ -341,6 +367,9 @@ function validateCustomerDetails(name: string, phone: string): string | null {
 
 interface ProcessRazorpayParams {
   total: number;
+  discountAmount?: number;
+  couponCode?: string;
+  couponId?: string;
   restaurantName?: string | null;
   name: string;
   cleanPhone: string;
@@ -404,6 +433,9 @@ async function processRazorpayPayment(params: ProcessRazorpayParams) {
             price: i.price,
           })),
           totalAmount: params.total,
+          discountAmount: params.discountAmount,
+          couponCode: params.couponCode,
+          couponId: params.couponId,
           paymentMethod: params.paymentMethod,
         });
 
@@ -456,6 +488,9 @@ interface ProcessCashParams {
   notes: string;
   items: CartItem[];
   total: number;
+  discountAmount?: number;
+  couponCode?: string;
+  couponId?: string;
   setActiveOrderId: (id: string) => void;
   clearCart: () => void;
   onSuccess: (targetUrl: string) => void;
@@ -465,9 +500,13 @@ interface ProcessCashParams {
 
 async function processCashPayment(params: ProcessCashParams) {
   try {
-    const formattedNotes = params.notes.trim()
+    let formattedNotes = params.notes.trim()
       ? `${params.notes.trim()} | [Payment: Cash at Table/Counter]`
       : `[Payment: Cash at Table/Counter]`;
+
+    if (params.couponCode) {
+      formattedNotes += ` | [Coupon: ${params.couponCode} (-₹${(params.discountAmount || 0).toFixed(2)})]`;
+    }
 
     const result = await createOrderAction({
       restaurantId: params.restaurantId,
@@ -481,6 +520,9 @@ async function processCashPayment(params: ProcessCashParams) {
         price: i.price,
       })),
       totalAmount: params.total,
+      discountAmount: params.discountAmount,
+      couponCode: params.couponCode,
+      couponId: params.couponId,
       status: "PENDING",
       paymentMethod: "CASH",
     });
@@ -522,6 +564,13 @@ export function CheckoutClient() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Coupon State
+  const [couponCodeInput, setCouponCodeInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCouponInfo | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<PublicCouponItem[]>([]);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+  const [showAvailableOffers, setShowAvailableOffers] = useState(false);
+
   // Payment Method: UPI (Razorpay), CASH, CARD
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("UPI");
   const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(true);
@@ -541,6 +590,18 @@ export function CheckoutClient() {
     void loadRazorpayScript();
   }, []);
 
+  // Fetch Available Public Coupons for this Restaurant
+  useEffect(() => {
+    if (restaurantId) {
+      axios
+        .get(`/api/coupons?restaurantId=${restaurantId}&public=true`)
+        .then((res) => {
+          setAvailableCoupons(res.data?.data || []);
+        })
+        .catch((err) => console.error("Failed to load available coupons:", err));
+    }
+  }, [restaurantId]);
+
   if (items.length === 0) {
     return (
       <EmptyCartView
@@ -550,9 +611,66 @@ export function CheckoutClient() {
   }
 
   const subtotal = getTotalPrice();
-  const taxes = subtotal * 0.05;
-  const total = subtotal + taxes;
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const taxes = discountedSubtotal * 0.05;
+  const total = discountedSubtotal + taxes;
   const totalItemCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  // Apply Coupon Handler
+  const handleApplyCoupon = async (codeToApply?: string) => {
+    const targetCode = (codeToApply || couponCodeInput).trim().toUpperCase();
+    if (!targetCode) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+
+    if (!restaurantId) {
+      toast.error("Restaurant context is missing");
+      return;
+    }
+
+    setIsValidatingCoupon(true);
+
+    try {
+      const res = await axios.post("/api/coupons/validate", {
+        code: targetCode,
+        restaurantId,
+        subtotal,
+        items: items.map((i) => ({
+          id: i.id,
+          quantity: i.quantity,
+          price: i.price,
+        })),
+      });
+
+      const couponData = res.data?.data;
+      if (couponData?.isValid) {
+        setAppliedCoupon({
+          couponId: couponData.couponId,
+          code: couponData.code,
+          discountAmount: couponData.discountAmount,
+          discountType: couponData.discountType,
+          discountValue: couponData.discountValue,
+          couponType: couponData.couponType,
+          message: couponData.message,
+        });
+        setCouponCodeInput(targetCode);
+        toast.success(`🎉 ${couponData.message}`, { duration: 4000 });
+      }
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || "Invalid coupon code for this order.");
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput("");
+    toast("Coupon removed", { icon: "ℹ️" });
+  };
 
   // Dynamic UPI Intent string for QR code
   const upiQrPayload = `upi://pay?pa=dailygrind.rzp@icici&pn=${encodeURIComponent(
@@ -585,6 +703,9 @@ export function CheckoutClient() {
       notes,
       items,
       total,
+      discountAmount,
+      couponCode: appliedCoupon?.code,
+      couponId: appliedCoupon?.couponId,
       setActiveOrderId,
       clearCart,
       onSuccess: (url: string) => router.push(url),
@@ -740,7 +861,144 @@ export function CheckoutClient() {
         </section>
 
         {/* ================================================================= */}
-        {/* 2. ORDER ITEMS & BILL BREAKDOWN */}
+        {/* 2. PROMOTIONS & COUPONS CARD */}
+        {/* ================================================================= */}
+        <section className="bg-white border border-stone-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between pb-2.5 border-b border-stone-100">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+                <TicketPercent size={15} />
+              </div>
+              <div>
+                <h2 className="font-bold text-sm text-stone-900 font-cormorant leading-none">
+                  Coupons & Offers
+                </h2>
+                <p className="text-[10px] text-stone-400">Apply promo codes for extra savings</p>
+              </div>
+            </div>
+
+            {appliedCoupon ? (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                <Check size={11} /> Saved ₹{appliedCoupon.discountAmount.toFixed(2)}
+              </span>
+            ) : availableCoupons.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowAvailableOffers(!showAvailableOffers)}
+                className="text-[11px] font-bold text-amber-800 hover:text-amber-950 flex items-center gap-1"
+              >
+                <span>{availableCoupons.length} Offers Available</span>
+                {showAvailableOffers ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
+            ) : null}
+          </div>
+
+          {/* Applied Coupon Display */}
+          {appliedCoupon ? (
+            <div className="p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
+                  ✓
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-xs text-emerald-950">
+                      {appliedCoupon.code}
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-semibold bg-white px-1.5 py-0.2 rounded border border-emerald-200">
+                      Applied
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    You saved ₹{appliedCoupon.discountAmount.toFixed(2)} on this order!
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRemoveCoupon}
+                className="text-xs font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            /* Input Box to Apply Coupon */
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+                  <input
+                    type="text"
+                    placeholder="Enter Coupon Code (e.g. FEAST1200)"
+                    value={couponCodeInput}
+                    onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                    className="w-full pl-8 pr-3 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs uppercase font-mono tracking-wider outline-none focus:border-amber-600 focus:bg-white transition-all text-stone-900 font-bold"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={isValidatingCoupon || !couponCodeInput.trim()}
+                  onClick={() => handleApplyCoupon()}
+                  className="px-4 py-2 bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-amber-300 font-bold text-xs rounded-xl shadow-2xs transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer"
+                >
+                  {isValidatingCoupon ? <Loader2 size={13} className="animate-spin" /> : "Apply"}
+                </button>
+              </div>
+
+              {/* Available Coupons Dropdown / List */}
+              {showAvailableOffers && availableCoupons.length > 0 && (
+                <div className="pt-2 space-y-1.5 border-t border-stone-100 max-h-48 overflow-y-auto pr-1 animate-in fade-in duration-200">
+                  <p className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">
+                    Tap to apply offer:
+                  </p>
+                  {availableCoupons.map((c) => {
+                    const isMinThresholdNotMet = (c.minOrderAmount || 0) > subtotal;
+                    const shortfall = ((c.minOrderAmount || 0) - subtotal).toFixed(2);
+
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleApplyCoupon(c.code)}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${isMinThresholdNotMet
+                          ? "bg-stone-50 border-stone-200 opacity-75 hover:opacity-100"
+                          : "bg-amber-50/50 border-amber-200 hover:bg-amber-100/60"
+                          }`}
+                      >
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-xs text-amber-950 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                              {c.code}
+                            </span>
+                            <span className="text-[11px] font-bold text-stone-800">
+                              {c.discountType === "PERCENTAGE" ? `${c.discountValue}% OFF` : `₹${c.discountValue} FLAT`}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-stone-500 mt-0.5">
+                            {c.description || (c.minOrderAmount ? `Min order ₹${c.minOrderAmount}` : "Special discount")}
+                          </p>
+                          {isMinThresholdNotMet && (
+                            <p className="text-[9px] text-amber-700 font-semibold mt-0.5">
+                              ⚠️ Add ₹{shortfall} more to unlock
+                            </p>
+                          )}
+                        </div>
+
+                        <span className="text-[11px] font-bold text-amber-800 underline">
+                          Apply
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* ================================================================= */}
+        {/* 3. ORDER ITEMS & BILL BREAKDOWN */}
         {/* ================================================================= */}
         <section className="bg-white border border-stone-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
           <button
@@ -754,7 +1012,7 @@ export function CheckoutClient() {
               </div>
               <div>
                 <h2 className="font-bold text-sm text-stone-900 font-cormorant leading-none">
-                  2. Order Summary ({items.length})
+                  3. Order Summary ({items.length})
                 </h2>
                 <p className="text-[10px] text-stone-400">Click to {isOrderSummaryOpen ? "hide" : "view"} bill breakdown</p>
               </div>
@@ -796,6 +1054,14 @@ export function CheckoutClient() {
                   <span>Item Total</span>
                   <span className="font-mono text-stone-900">₹{subtotal.toFixed(2)}</span>
                 </div>
+                {appliedCoupon && appliedCoupon.discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-semibold text-[11px] bg-emerald-50 px-2 py-1 rounded-lg">
+                    <span className="flex items-center gap-1">
+                      <span>🎟️ Coupon ({appliedCoupon.code})</span>
+                    </span>
+                    <span className="font-mono font-bold">-₹{appliedCoupon.discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-[11px]">
                   <span className="text-stone-500">GST Taxes (5%)</span>
                   <span className="font-mono text-stone-800">₹{taxes.toFixed(2)}</span>

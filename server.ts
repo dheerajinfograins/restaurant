@@ -1,21 +1,32 @@
-import { createServer, IncomingMessage, ServerResponse } from 'http';
-import { parse } from 'url';
+import { createServer, IncomingMessage, ServerResponse } from 'node:http';
 import next from 'next';
 import { Server as SocketIOServer } from 'socket.io';
+import os from 'node:os';
+
+function getLocalNetworkIp(): string {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name] || []) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return process.env.HOST || 'localhost';
+}
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = '192.168.1.46';
-const port = parseInt(process.env.PORT || '3000', 10);
+const networkIp = getLocalNetworkIp();
+const port = Number.parseInt(process.env.PORT || '3000', 10);
 
-const app = next({ dev, hostname, port });
+const app = next({ dev, hostname: '0.0.0.0', port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       if (!req.url) throw new Error('No url on request');
-      const parsedUrl = parse(req.url, true);
-      await handle(req, res, parsedUrl);
+      await handle(req, res);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
       res.statusCode = 500;
@@ -27,6 +38,14 @@ app.prepare().then(() => {
     cors: {
       origin: "*",
       methods: ["GET", "POST"]
+    },
+    destroyUpgrade: false,
+  });
+
+  const upgradeHandler = app.getUpgradeHandler();
+  server.on('upgrade', (req, socket, head) => {
+    if (req.url?.startsWith('/_next/')) {
+      upgradeHandler(req, socket, head);
     }
   });
 
@@ -44,9 +63,14 @@ app.prepare().then(() => {
   });
 
   // Make io available globally so API routes can use it if needed
-  (global as any).io = io;
+  // @ts-expect-error - attach io to global
+  global.io = io;
 
-  server.listen(port, hostname, () => {
-    console.log(`> Ready on http://${hostname}:${port}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log('\n=====================================================');
+    console.log('🚀 RESTAURANT MANAGEMENT SYSTEM LIVE & READY');
+    console.log(`  - Local:   http://localhost:${port}`);
+    console.log(`  - Network: http://${networkIp}:${port}`);
+    console.log('=====================================================\n');
   });
 });

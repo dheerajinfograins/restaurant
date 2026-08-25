@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
+import axios from "axios";
 import {
   Search,
   X,
@@ -11,7 +12,9 @@ import {
   Minus,
   ArrowLeft,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Sparkles,
+  Tag,
 } from "lucide-react";
 import { useCartStore } from "@/store/cart-store";
 import toast from "react-hot-toast";
@@ -297,23 +300,83 @@ function FoodTypeBadge({ foodType, showVegIcon = true }: FoodTypeBadgeProps) {
   return null;
 }
 
+interface PublicCouponInfo {
+  id: string;
+  code: string;
+  description?: string | null;
+  couponType: string;
+  discountType: string;
+  discountValue: number;
+  minOrderAmount?: number | null;
+  maxDiscount?: number | null;
+  productIds: string[];
+}
+
+function ActiveCouponsBanner({ coupons }: { coupons: PublicCouponInfo[] }) {
+  if (!coupons || coupons.length === 0) return null;
+
+  return (
+    <div className="p-3.5 bg-gradient-to-r from-stone-900 via-stone-800 to-amber-950 text-white rounded-3xl shadow-md border border-amber-500/30 space-y-2 relative overflow-hidden">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+            <Sparkles size={14} />
+          </div>
+          <span className="text-xs font-bold text-amber-300 tracking-wide uppercase">
+            Exclusive Dining Offers
+          </span>
+        </div>
+        <span className="text-[10px] text-stone-400 font-semibold">
+          Apply at checkout
+        </span>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {coupons.map((c) => (
+          <div
+            key={c.id}
+            className="p-2.5 bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 rounded-2xl shrink-0 flex items-center gap-2.5 transition-all text-xs"
+          >
+            <div className="px-2 py-1 bg-amber-400 text-stone-950 font-mono font-black text-[11px] rounded-lg">
+              {c.code}
+            </div>
+            <div>
+              <p className="font-bold text-white text-[11px] leading-tight">
+                {c.discountType === "PERCENTAGE" ? `${c.discountValue}% OFF` : `₹${c.discountValue} FLAT OFF`}
+              </p>
+              <p className="text-[9px] text-amber-200/80 leading-tight">
+                {c.minOrderAmount ? `Orders above ₹${c.minOrderAmount}` : c.description || "Special offer"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface CategoryLandingScreenProps {
   readonly mainCategoryCounts: Record<MainCategoryKey, number>;
+  readonly activeCoupons: PublicCouponInfo[];
   readonly onSelectCategory: (categoryId: MainCategoryKey) => void;
 }
 
 function CategoryLandingScreen({
   mainCategoryCounts,
+  activeCoupons,
   onSelectCategory,
 }: CategoryLandingScreenProps) {
   return (
-    <div className="space-y-6 animate-in fade-in-50 duration-300 pb-10">
+    <div className="space-y-5 animate-in fade-in-50 duration-300 pb-10">
+      {/* Active Coupons Banner */}
+      {activeCoupons.length > 0 && <ActiveCouponsBanner coupons={activeCoupons} />}
+
       {/* Welcome Text */}
-      <div className="text-center pt-2">
+      <div className="text-center pt-1">
         <span className="text-[11px] font-extrabold uppercase tracking-widest text-amber-800 bg-amber-100/70 px-3 py-1 rounded-full border border-amber-200 shadow-2xs inline-block">
           Menu Categories
         </span>
-        <h2 className="text-2xl sm:text-3xl font-bold font-cormorant text-culinary-text mt-2.5 tracking-tight">
+        <h2 className="text-2xl sm:text-3xl font-bold font-cormorant text-culinary-text mt-2 tracking-tight">
           What are you craving today?
         </h2>
         <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
@@ -400,11 +463,10 @@ function FoodTypeFilterButtons({
       <button
         type="button"
         onClick={() => onFilterChange("ALL")}
-        className={`py-2 rounded-xl text-xs font-bold transition-all text-center ${
-          foodTypeFilter === "ALL"
+        className={`py-2 rounded-xl text-xs font-bold transition-all text-center ${foodTypeFilter === "ALL"
             ? "bg-gray-900 text-white shadow-2xs scale-[1.02]"
             : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
-        }`}
+          }`}
       >
         All
       </button>
@@ -413,11 +475,10 @@ function FoodTypeFilterButtons({
         <button
           type="button"
           onClick={() => onFilterChange(foodTypeFilter === "VEG" ? "ALL" : "VEG")}
-          className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${
-            foodTypeFilter === "VEG"
+          className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${foodTypeFilter === "VEG"
               ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs scale-[1.02]"
               : "bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-          }`}
+            }`}
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           <span>Veg</span>
@@ -427,11 +488,10 @@ function FoodTypeFilterButtons({
       <button
         type="button"
         onClick={() => onFilterChange(foodTypeFilter === "NON_VEG" ? "ALL" : "NON_VEG")}
-        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${
-          foodTypeFilter === "NON_VEG"
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${foodTypeFilter === "NON_VEG"
             ? "bg-rose-600 text-white border-rose-600 shadow-2xs scale-[1.02]"
             : "bg-white text-rose-700 border-rose-300 hover:bg-rose-50"
-        }`}
+          }`}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
         <span>Non-Veg</span>
@@ -440,11 +500,10 @@ function FoodTypeFilterButtons({
       <button
         type="button"
         onClick={() => onFilterChange(foodTypeFilter === "EGG" ? "ALL" : "EGG")}
-        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${
-          foodTypeFilter === "EGG"
+        className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all border ${foodTypeFilter === "EGG"
             ? "bg-amber-600 text-white border-amber-600 shadow-2xs scale-[1.02]"
             : "bg-white text-amber-700 border-amber-300 hover:bg-amber-50"
-        }`}
+          }`}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
         <span>Egg</span>
@@ -459,6 +518,7 @@ interface ProductCardItemProps {
   readonly showImages: boolean;
   readonly showPrices: boolean;
   readonly showVegIcon: boolean;
+  readonly applicableCoupon?: PublicCouponInfo | null;
   readonly onSelect: (product: MenuProduct) => void;
   readonly onAdd: (product: MenuProduct, e?: React.MouseEvent) => void;
   readonly onUpdateQuantity: (productId: string, newQuantity: number, e?: React.MouseEvent) => void;
@@ -470,6 +530,7 @@ function ProductCardItem({
   showImages,
   showPrices,
   showVegIcon,
+  applicableCoupon,
   onSelect,
   onAdd,
   onUpdateQuantity,
@@ -520,6 +581,19 @@ function ProductCardItem({
               <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
                 {product.description}
               </p>
+            )}
+
+            {/* Applicable Coupon Offer Tag */}
+            {applicableCoupon && (
+              <div className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-amber-900 bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-300 w-fit">
+                <Tag size={10} className="text-amber-800" />
+                <span>
+                  {applicableCoupon.code} •{" "}
+                  {applicableCoupon.discountType === "PERCENTAGE"
+                    ? `${applicableCoupon.discountValue}% OFF`
+                    : `₹${applicableCoupon.discountValue} OFF`}
+                </span>
+              </div>
             )}
           </div>
 
@@ -757,11 +831,10 @@ function PaginationControls({
                   type="button"
                   key={pageNum}
                   onClick={() => onPageChange(pageNum)}
-                  className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
-                    isCurrent
+                  className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${isCurrent
                       ? "bg-culinary-primary text-white shadow-sm scale-105"
                       : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   {pageNum}
                 </button>
@@ -809,7 +882,28 @@ export function ProductListClient({
   const [selectedProduct, setSelectedProduct] = useState<MenuProduct | null>(null);
 
   const productsTopRef = useRef<HTMLDivElement>(null);
-  const { items, addItem, updateQuantity, removeItem } = useCartStore();
+  const { items, addItem, updateQuantity, removeItem, restaurantId } = useCartStore();
+
+  const [activeCoupons, setActiveCoupons] = useState<PublicCouponInfo[]>([]);
+
+  useEffect(() => {
+    if (restaurantId) {
+      axios
+        .get(`/api/coupons?restaurantId=${restaurantId}&public=true`)
+        .then((res) => {
+          setActiveCoupons(res.data?.data || []);
+        })
+        .catch((err) => console.error("Failed to load active coupons for menu:", err));
+    }
+  }, [restaurantId]);
+
+  const findProductCoupon = (productId: string) => {
+    return activeCoupons.find(
+      (c) =>
+        c.couponType === "PRODUCT_DISCOUNT" &&
+        (c.productIds.length === 0 || c.productIds.includes(productId))
+    );
+  };
 
   const showVegIcon = settings?.showVegNonVeg !== false;
   const showPrices = settings?.qrShowPrices !== false;
@@ -911,6 +1005,7 @@ export function ProductListClient({
     return (
       <CategoryLandingScreen
         mainCategoryCounts={mainCategoryCounts}
+        activeCoupons={activeCoupons}
         onSelectCategory={handleSelectCategory}
       />
     );
@@ -921,6 +1016,9 @@ export function ProductListClient({
 
   return (
     <div ref={productsTopRef} className="space-y-4 animate-in fade-in-50 duration-300 pb-12">
+      {/* Active Coupons Banner in Category Detail */}
+      {activeCoupons.length > 0 && <ActiveCouponsBanner coupons={activeCoupons} />}
+
       {/* Top Header / Back Button Bar */}
       <div className="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-gray-200/80 shadow-xs">
         <button
@@ -1025,6 +1123,7 @@ export function ProductListClient({
                 showImages={showImages}
                 showPrices={showPrices}
                 showVegIcon={showVegIcon}
+                applicableCoupon={findProductCoupon(product.id)}
                 onSelect={setSelectedProduct}
                 onAdd={handleAdd}
                 onUpdateQuantity={handleUpdateQuantity}
