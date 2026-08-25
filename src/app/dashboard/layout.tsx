@@ -49,7 +49,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SocketProvider restaurantId={restaurantId}>
+    <SocketProvider restaurantId={restaurantId} role={role}>
       <div className="flex h-screen bg-culinary-background overflow-hidden">
         <Sidebar role={role} restaurantName={restaurantName} logo={restaurantLogo} />
         <div className="flex flex-col flex-1 overflow-hidden relative">

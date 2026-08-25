@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalPayload } from "@/lib/permissions";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 export async function POST(request: Request) {
   try {
@@ -42,17 +43,8 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString(),
     };
 
-    // Emit live real-time socket event once (scoped to restaurant room or fallback to global)
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${restaurantId}`).emit("waiter:call", callPayload);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("waiter:call", callPayload);
-      }
-    }
+    // Emit live real-time socket event once (scoped to restaurant room and super admin)
+    emitAppSocketEvent("waiter:call", callPayload, restaurantId);
 
     return NextResponse.json({
       success: true,

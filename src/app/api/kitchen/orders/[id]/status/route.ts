@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 export async function PATCH(
   request: Request,
@@ -25,6 +26,13 @@ export async function PATCH(
           },
         },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
         waiter: {
           select: {
             id: true,
@@ -35,31 +43,11 @@ export async function PATCH(
       },
     });
 
-
-    // Emit live socket event once if socket.io is initialized
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (updatedOrder.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:updated", updatedOrder);
-        if (status === "READY") {
-          // @ts-expect-error - global.io is set in server.ts
-          global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:ready", updatedOrder);
-        } else if (status === "SERVED") {
-          // @ts-expect-error - global.io is set in server.ts
-          global.io.to(`restaurant:${updatedOrder.restaurantId}`).emit("order:served", updatedOrder);
-        }
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:updated", updatedOrder);
-        if (status === "READY") {
-          // @ts-expect-error - global.io is set in server.ts
-          global.io.emit("order:ready", updatedOrder);
-        } else if (status === "SERVED") {
-          // @ts-expect-error - global.io is set in server.ts
-          global.io.emit("order:served", updatedOrder);
-        }
-      }
+    emitAppSocketEvent("order:updated", updatedOrder, updatedOrder.restaurantId);
+    if (status === "READY") {
+      emitAppSocketEvent("order:ready", updatedOrder, updatedOrder.restaurantId);
+    } else if (status === "SERVED") {
+      emitAppSocketEvent("order:served", updatedOrder, updatedOrder.restaurantId);
     }
 
     return NextResponse.json({ success: true, order: updatedOrder });

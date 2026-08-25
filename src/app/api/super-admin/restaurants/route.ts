@@ -6,6 +6,7 @@ import { requireRoles } from "@/lib/permissions";
 import { AppError, HTTP_STATUS } from "@/exceptions";
 import { hashPassword } from "@/lib/bcrypt";
 import { DietaryCategory, UserRole } from "@prisma/client";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 // GET /api/super-admin/restaurants - Fetch all restaurants with stats & owner info
 export async function GET() {
@@ -230,6 +231,18 @@ export async function POST(request: NextRequest) {
       });
 
       return { restaurant, owner };
+    });
+
+    emitAppSocketEvent("restaurant:registered", {
+      id: result.restaurant.id,
+      name: result.restaurant.name,
+      email: result.restaurant.email,
+      phone: result.restaurant.phone,
+      dietaryCategory: result.restaurant.dietaryCategory,
+      city: result.restaurant.city,
+      ownerName: result.owner.name,
+      ownerEmail: result.owner.email,
+      createdAt: result.restaurant.createdAt,
     });
 
     return successResponse("Restaurant registered successfully", result, HTTP_STATUS.CREATED);

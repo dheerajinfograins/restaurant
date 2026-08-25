@@ -56,6 +56,8 @@ export async function getActiveKitchenOrdersAction() {
   }
 }
 
+import { emitAppSocketEvent } from "@/lib/socket-server";
+
 export async function acceptOrderAction(orderId: string) {
   try {
     const order = await prisma.order.update({
@@ -64,19 +66,17 @@ export async function acceptOrderAction(orderId: string) {
       include: {
         items: { include: { product: true } },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
       },
     });
 
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (order.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:updated", order);
-      }
-    }
+    emitAppSocketEvent("order:updated", order, order.restaurantId);
 
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/orders");
@@ -95,6 +95,13 @@ export async function markAsReadyAction(orderId: string) {
       include: {
         items: { include: { product: true } },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
         waiter: {
           select: {
             id: true,
@@ -105,20 +112,8 @@ export async function markAsReadyAction(orderId: string) {
       },
     });
 
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (order.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:ready", order);
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:ready", order);
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:updated", order);
-      }
-    }
+    emitAppSocketEvent("order:ready", order, order.restaurantId);
+    emitAppSocketEvent("order:updated", order, order.restaurantId);
 
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/orders");
@@ -137,6 +132,13 @@ export async function markAsServedAction(orderId: string) {
       include: {
         items: { include: { product: true } },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
         waiter: {
           select: {
             id: true,
@@ -147,21 +149,8 @@ export async function markAsServedAction(orderId: string) {
       },
     });
 
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (order.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:served", order);
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:updated", order);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:served", order);
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:updated", order);
-      }
-    }
-
+    emitAppSocketEvent("order:served", order, order.restaurantId);
+    emitAppSocketEvent("order:updated", order, order.restaurantId);
 
     revalidatePath("/dashboard/kitchen");
     revalidatePath("/dashboard/orders");

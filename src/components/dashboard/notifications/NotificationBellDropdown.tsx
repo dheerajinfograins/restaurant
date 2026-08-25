@@ -15,6 +15,9 @@ import {
   Sparkles,
   Trash2,
   User,
+  DollarSign,
+  Tag,
+  Building2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,11 +33,11 @@ import NotificationDetailModal, {
   NotificationType,
 } from "./NotificationDetailModal";
 
-const STORAGE_KEY = "restaurant_notifications_history_v2";
+const STORAGE_KEY = "restaurant_notifications_history_v3";
 
 const emptySubscribe = () => () => {};
 
-type FilterTab = "ALL" | "UNREAD" | "ORDERS" | "ALERTS";
+type FilterTab = "ALL" | "UNREAD" | "ORDERS" | "PAYMENTS" | "COUPONS" | "ALERTS";
 
 interface OrderItemPayload {
   id?: string;
@@ -56,6 +59,12 @@ interface OrderPayload {
   notes?: string;
   paymentMethod?: string | null;
   createdAt?: string;
+  restaurantId?: string;
+  restaurant?: {
+    id?: string;
+    name?: string;
+    dietaryCategory?: string;
+  } | null;
   table?: {
     tableNumber?: string | number;
   } | null;
@@ -67,17 +76,62 @@ interface OrderPayload {
   items?: OrderItemPayload[];
 }
 
+interface PaymentPayload {
+  orderId?: string;
+  orderNumber?: string;
+  totalAmount?: number | string;
+  paymentMethod?: string | null;
+  status?: string;
+  customerName?: string;
+  customerPhone?: string;
+  tableNumber?: string | number;
+  restaurantId?: string;
+  restaurantName?: string;
+  paymentTrace?: string;
+  timestamp?: string;
+}
+
+interface CouponPayload {
+  id: string;
+  code: string;
+  description?: string | null;
+  couponType?: string;
+  discountType?: string;
+  discountValue?: number;
+  minOrderAmount?: number;
+  maxDiscount?: number | null;
+  restaurantId?: string;
+  restaurantName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface RestaurantRegisteredPayload {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  dietaryCategory?: string;
+  city?: string | null;
+  ownerName?: string;
+  ownerEmail?: string;
+  createdAt?: string;
+}
+
 interface WaiterCallPayload {
   tableNumber?: string | number;
   waiterId?: string;
   waiterName?: string;
   reason?: string;
+  restaurantId?: string;
+  restaurantName?: string;
 }
 
 interface StaffStatusPayload {
   userId?: string;
   role?: string;
   isActive?: boolean;
+  restaurantId?: string;
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -89,7 +143,7 @@ function formatRelativeTime(dateString: string): string {
   if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
   const diffInMinutes = Math.floor(diffInSeconds / 60);
   if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-  const diffInHours = Math.floor(diffInMinutes / 60);
+  const diffInHours = Math.floor(diffInSeconds / 60);
   if (diffInHours < 24) return `${diffInHours}h ago`;
   const diffInDays = Math.floor(diffInHours / 24);
   if (diffInDays === 1) return "Yesterday";
@@ -189,6 +243,8 @@ function buildInitialOrderNotification(
     timestamp: order.createdAt || new Date().toISOString(),
     isRead: true, // initial backfill is marked read
     metadata: {
+      restaurantId: order.restaurantId || order.restaurant?.id,
+      restaurantName: order.restaurant?.name,
       orderId: order.id,
       orderNumber: order.orderNumber,
       tableNumber,
@@ -359,9 +415,6 @@ export default function NotificationBellDropdown() {
 
       setNotifications((prev) => {
         // Deduplicate checks:
-        // 1) Same orderId + same notification type
-        // 2) Exact same type + title + message within 15 seconds
-        // 3) Same waiter call/ack within 15 seconds
         const isDuplicate = prev.some((existing) => {
           if (
             notif.metadata?.orderId &&
@@ -422,7 +475,7 @@ export default function NotificationBellDropdown() {
     [soundEnabled, saveNotifications]
   );
 
-  // Real-time socket listeners
+  // Real-time socket listeners for Orders, Payments, Coupons, Restaurants & Staff
   useEffect(() => {
     if (!socket) return;
 
@@ -430,14 +483,16 @@ export default function NotificationBellDropdown() {
       const tableNumber = order.table?.tableNumber ? String(order.table.tableNumber) : "";
       const tableLabel = tableNumber ? `Table ${tableNumber}` : "Takeaway";
       const itemsCount = calculateOrderItemsCount(order.items);
+      const restPrefix = order.restaurant?.name ? `[${order.restaurant.name}] ` : "";
 
       addNotification({
         type: "ORDER_NEW",
-        title: `New Order #${order.orderNumber || ""}`,
-        message: `${tableLabel} • ${order.customerName || "Customer"
-          } ordered ${itemsCount} items (₹${Number(order.totalAmount || 0).toFixed(2)})`,
+        title: `${restPrefix}New Order #${order.orderNumber || ""}`,
+        message: `${tableLabel} • ${order.customerName || "Customer"} ordered ${itemsCount} items (₹${Number(order.totalAmount || 0).toFixed(2)})`,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: order.restaurantId || order.restaurant?.id,
+          restaurantName: order.restaurant?.name,
           orderId: order.id,
           orderNumber: order.orderNumber,
           tableNumber,
@@ -453,19 +508,23 @@ export default function NotificationBellDropdown() {
         },
       });
 
-      toast.success(`🛎️ New Order #${order.orderNumber || ""} received!`, {
+      toast.success(`🛎️ ${restPrefix}New Order #${order.orderNumber || ""} received!`, {
         id: `order-new-${order.id}`,
       });
     };
 
     const handleOrderReady = (order: OrderPayload) => {
       const locationLabel = order.table?.tableNumber ? `Table ${order.table.tableNumber}` : "Takeaway";
+      const restPrefix = order.restaurant?.name ? `[${order.restaurant.name}] ` : "";
+
       addNotification({
         type: "ORDER_READY",
-        title: `Order #${order.orderNumber || ""} Ready to Serve!`,
+        title: `${restPrefix}Order #${order.orderNumber || ""} Ready to Serve!`,
         message: `Kitchen marked dishes ready for ${locationLabel}.`,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: order.restaurantId || order.restaurant?.id,
+          restaurantName: order.restaurant?.name,
           orderId: order.id,
           orderNumber: order.orderNumber,
           tableNumber: order.table?.tableNumber ? String(order.table.tableNumber) : undefined,
@@ -478,7 +537,7 @@ export default function NotificationBellDropdown() {
         },
       });
 
-      toast(`👨‍🍳 Order #${order.orderNumber || ""} is ready to serve!`, {
+      toast(`👨‍🍳 ${restPrefix}Order #${order.orderNumber || ""} is ready to serve!`, {
         icon: "✨",
         id: `order-ready-${order.id}`,
       });
@@ -486,12 +545,16 @@ export default function NotificationBellDropdown() {
 
     const handleOrderServed = (order: OrderPayload) => {
       const recipientLabel = order.table?.tableNumber ? `Table ${order.table.tableNumber}` : "Guest";
+      const restPrefix = order.restaurant?.name ? `[${order.restaurant.name}] ` : "";
+
       addNotification({
         type: "ORDER_SERVED",
-        title: `Order #${order.orderNumber || ""} Served`,
+        title: `${restPrefix}Order #${order.orderNumber || ""} Served`,
         message: `Delivered to ${recipientLabel}.`,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: order.restaurantId || order.restaurant?.id,
+          restaurantName: order.restaurant?.name,
           orderId: order.id,
           orderNumber: order.orderNumber,
           tableNumber: order.table?.tableNumber ? String(order.table.tableNumber) : undefined,
@@ -505,11 +568,160 @@ export default function NotificationBellDropdown() {
       });
     };
 
+    const handleOrderCancelled = (order: OrderPayload) => {
+      const restPrefix = order.restaurant?.name ? `[${order.restaurant.name}] ` : "";
+      addNotification({
+        type: "ORDER_CANCELLED",
+        title: `${restPrefix}Order #${order.orderNumber || ""} Cancelled`,
+        message: `Order was cancelled. Total amount: ₹${Number(order.totalAmount || 0).toFixed(2)}.`,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          restaurantId: order.restaurantId || order.restaurant?.id,
+          restaurantName: order.restaurant?.name,
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          status: "CANCELLED",
+          totalAmount: Number(order.totalAmount || 0),
+        },
+      });
+
+      toast.error(`❌ ${restPrefix}Order #${order.orderNumber || ""} was cancelled`, {
+        id: `order-cancel-${order.id}`,
+      });
+    };
+
+    const handlePaymentReceived = (payment: PaymentPayload) => {
+      const restPrefix = payment.restaurantName ? `[${payment.restaurantName}] ` : "";
+      const methodLabel = payment.paymentMethod || "Online";
+
+      addNotification({
+        type: "PAYMENT_RECEIVED",
+        title: `${restPrefix}Payment Received (₹${Number(payment.totalAmount || 0).toFixed(2)})`,
+        message: `Order #${payment.orderNumber || ""} paid via ${methodLabel} by ${payment.customerName || "Customer"}.`,
+        timestamp: payment.timestamp || new Date().toISOString(),
+        metadata: {
+          restaurantId: payment.restaurantId,
+          restaurantName: payment.restaurantName,
+          orderId: payment.orderId,
+          orderNumber: payment.orderNumber,
+          totalAmount: Number(payment.totalAmount || 0),
+          paymentMethod: payment.paymentMethod,
+          customerName: payment.customerName,
+          customerPhone: payment.customerPhone,
+          tableNumber: payment.tableNumber ? String(payment.tableNumber) : undefined,
+          status: "PAID",
+          paymentTrace: payment.paymentTrace,
+        },
+      });
+
+      toast.success(`💳 ${restPrefix}Payment of ₹${Number(payment.totalAmount || 0).toFixed(2)} received (${methodLabel})!`, {
+        id: `payment-${payment.orderId || payment.orderNumber || Date.now()}`,
+      });
+    };
+
+    const handleCouponCreated = (coupon: CouponPayload) => {
+      const restPrefix = coupon.restaurantName ? `[${coupon.restaurantName}] ` : "";
+      const discountText =
+        coupon.discountType === "PERCENTAGE"
+          ? `${coupon.discountValue}% OFF`
+          : `₹${coupon.discountValue} FLAT OFF`;
+
+      addNotification({
+        type: "COUPON_CREATED",
+        title: `${restPrefix}New Coupon '${coupon.code}' Created`,
+        message: `Promotional coupon offering ${discountText} created.`,
+        timestamp: coupon.createdAt || new Date().toISOString(),
+        metadata: {
+          restaurantId: coupon.restaurantId,
+          restaurantName: coupon.restaurantName,
+          couponId: coupon.id,
+          couponCode: coupon.code,
+          couponType: coupon.couponType,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+          minOrderAmount: coupon.minOrderAmount,
+          maxDiscount: coupon.maxDiscount,
+          description: coupon.description,
+          actionUrl: "/dashboard/coupons",
+        },
+      });
+
+      toast.success(`🎟️ ${restPrefix}New Coupon '${coupon.code}' created!`, {
+        id: `coupon-new-${coupon.id}`,
+      });
+    };
+
+    const handleCouponUpdated = (coupon: CouponPayload) => {
+      const restPrefix = coupon.restaurantName ? `[${coupon.restaurantName}] ` : "";
+      addNotification({
+        type: "COUPON_UPDATED",
+        title: `${restPrefix}Coupon '${coupon.code}' Updated`,
+        message: `Settings & discount values updated for coupon ${coupon.code}.`,
+        timestamp: coupon.updatedAt || new Date().toISOString(),
+        metadata: {
+          restaurantId: coupon.restaurantId,
+          restaurantName: coupon.restaurantName,
+          couponId: coupon.id,
+          couponCode: coupon.code,
+          couponType: coupon.couponType,
+          discountType: coupon.discountType,
+          discountValue: coupon.discountValue,
+          minOrderAmount: coupon.minOrderAmount,
+          maxDiscount: coupon.maxDiscount,
+          description: coupon.description,
+          actionUrl: "/dashboard/coupons",
+        },
+      });
+    };
+
+    const handleCouponDeleted = (coupon: { id: string; code: string; restaurantName?: string; restaurantId?: string }) => {
+      const restPrefix = coupon.restaurantName ? `[${coupon.restaurantName}] ` : "";
+      addNotification({
+        type: "COUPON_DELETED",
+        title: `${restPrefix}Coupon '${coupon.code}' Removed`,
+        message: `Promotional coupon ${coupon.code} was removed from the active system.`,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          restaurantId: coupon.restaurantId,
+          restaurantName: coupon.restaurantName,
+          couponId: coupon.id,
+          couponCode: coupon.code,
+          actionUrl: "/dashboard/coupons",
+        },
+      });
+    };
+
+    const handleRestaurantRegistered = (rest: RestaurantRegisteredPayload) => {
+      addNotification({
+        type: "RESTAURANT_REGISTERED",
+        title: `🏢 New Restaurant Registered: ${rest.name}`,
+        message: `New tenant registered (${rest.dietaryCategory?.replaceAll("_", " ") || "Both"}) by owner ${rest.ownerName} (${rest.ownerEmail}).`,
+        timestamp: rest.createdAt || new Date().toISOString(),
+        metadata: {
+          newRestaurantId: rest.id,
+          newRestaurantName: rest.name,
+          email: rest.email,
+          phone: rest.phone,
+          dietaryCategory: rest.dietaryCategory,
+          city: rest.city,
+          ownerName: rest.ownerName,
+          ownerEmail: rest.ownerEmail,
+          actionUrl: "/dashboard/restaurants",
+        },
+      });
+
+      toast.success(`🎉 New Restaurant '${rest.name}' registered on the platform!`, {
+        id: `rest-reg-${rest.id}`,
+      });
+    };
+
     const handleWaiterCall = (data: WaiterCallPayload & { message?: string }) => {
       const hasTable = Boolean(data.tableNumber);
+      const restPrefix = data.restaurantName ? `[${data.restaurantName}] ` : "";
       const title = hasTable
-        ? `Table #${data.tableNumber} Calling Waiter`
-        : `Waiter Call Alert`;
+        ? `${restPrefix}Table #${data.tableNumber} Calling Waiter`
+        : `${restPrefix}Waiter Call Alert`;
       const fallbackMessage = hasTable
         ? `Customer at Table ${data.tableNumber} requested assistance (${data.reason || "Assistance"}).`
         : `Admin/Manager called for waiter assistance (${data.reason || "Report to counter"}).`;
@@ -521,6 +733,8 @@ export default function NotificationBellDropdown() {
         message,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: data.restaurantId,
+          restaurantName: data.restaurantName,
           tableNumber: data.tableNumber ? String(data.tableNumber) : undefined,
           waiterId: data.waiterId,
           waiterName: data.waiterName,
@@ -530,11 +744,11 @@ export default function NotificationBellDropdown() {
       });
 
       if (hasTable) {
-        toast.error(`🚨 Table ${data.tableNumber} is calling for service!`, {
+        toast.error(`🚨 ${restPrefix}Table ${data.tableNumber} is calling for service!`, {
           id: `table-call-${data.tableNumber}`,
         });
       } else {
-        toast(`🚨 Waiter call alert sent to ${data.waiterName || "Staff"}!`, {
+        toast(`🚨 ${restPrefix}Waiter call alert sent to ${data.waiterName || "Staff"}!`, {
           icon: "🛎️",
           id: `waiter-call-${data.waiterId || "alert"}`,
         });
@@ -543,9 +757,10 @@ export default function NotificationBellDropdown() {
 
     const handleWaiterCallAck = (data: WaiterCallPayload & { message?: string }) => {
       const hasTable = Boolean(data.tableNumber);
+      const restPrefix = data.restaurantName ? `[${data.restaurantName}] ` : "";
       const title = hasTable
-        ? `Table #${data.tableNumber} Call Attended`
-        : `Waiter Call Acknowledged`;
+        ? `${restPrefix}Table #${data.tableNumber} Call Attended`
+        : `${restPrefix}Waiter Call Acknowledged`;
       const waiterLabel = data.waiterName || "Staff";
       const fallbackMessage = hasTable
         ? `Waiter ${waiterLabel} acknowledged Table ${data.tableNumber}.`
@@ -558,6 +773,8 @@ export default function NotificationBellDropdown() {
         message,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: data.restaurantId,
+          restaurantName: data.restaurantName,
           tableNumber: data.tableNumber ? String(data.tableNumber) : undefined,
           waiterId: data.waiterId,
           waiterName: data.waiterName,
@@ -574,10 +791,10 @@ export default function NotificationBellDropdown() {
       addNotification({
         type: "STAFF_STATUS",
         title: `Staff Status Changed`,
-        message: `Account status updated to ${data.isActive ? "Active (Can Log In)" : "Inactive (Deactivated)"
-          }.`,
+        message: `Account status updated to ${data.isActive ? "Active (Can Log In)" : "Inactive (Deactivated)"}.`,
         timestamp: new Date().toISOString(),
         metadata: {
+          restaurantId: data.restaurantId,
           staffId: data.userId,
           role: data.role,
           isActive: data.isActive,
@@ -589,6 +806,12 @@ export default function NotificationBellDropdown() {
     socket.on("order:new", handleNewOrder);
     socket.on("order:ready", handleOrderReady);
     socket.on("order:served", handleOrderServed);
+    socket.on("order:cancelled", handleOrderCancelled);
+    socket.on("payment:received", handlePaymentReceived);
+    socket.on("coupon:created", handleCouponCreated);
+    socket.on("coupon:updated", handleCouponUpdated);
+    socket.on("coupon:deleted", handleCouponDeleted);
+    socket.on("restaurant:registered", handleRestaurantRegistered);
     socket.on("waiter:call", handleWaiterCall);
     socket.on("waiter:call:acknowledged", handleWaiterCallAck);
     socket.on("staff:status_changed", handleStaffStatusChanged);
@@ -597,6 +820,12 @@ export default function NotificationBellDropdown() {
       socket.off("order:new", handleNewOrder);
       socket.off("order:ready", handleOrderReady);
       socket.off("order:served", handleOrderServed);
+      socket.off("order:cancelled", handleOrderCancelled);
+      socket.off("payment:received", handlePaymentReceived);
+      socket.off("coupon:created", handleCouponCreated);
+      socket.off("coupon:updated", handleCouponUpdated);
+      socket.off("coupon:deleted", handleCouponDeleted);
+      socket.off("restaurant:registered", handleRestaurantRegistered);
       socket.off("waiter:call", handleWaiterCall);
       socket.off("waiter:call:acknowledged", handleWaiterCallAck);
       socket.off("staff:status_changed", handleStaffStatusChanged);
@@ -618,9 +847,15 @@ export default function NotificationBellDropdown() {
             n.type
           )
         );
+      case "PAYMENTS":
+        return notifications.filter((n) => n.type === "PAYMENT_RECEIVED");
+      case "COUPONS":
+        return notifications.filter((n) =>
+          ["COUPON_CREATED", "COUPON_UPDATED", "COUPON_DELETED"].includes(n.type)
+        );
       case "ALERTS":
         return notifications.filter((n) =>
-          ["WAITER_CALL", "WAITER_CALL_ACK", "STAFF_STATUS"].includes(n.type)
+          ["WAITER_CALL", "WAITER_CALL_ACK", "STAFF_STATUS", "RESTAURANT_REGISTERED"].includes(n.type)
         );
       case "ALL":
       default:
@@ -644,7 +879,6 @@ export default function NotificationBellDropdown() {
   };
 
   const handleNotificationClick = (notif: AppNotification) => {
-    // Mark clicked notification as read
     if (!notif.isRead) {
       setNotifications((prev) => {
         const next = prev.map((n) => (n.id === notif.id ? { ...n, isRead: true } : n));
@@ -653,7 +887,6 @@ export default function NotificationBellDropdown() {
       });
     }
 
-    // Open detail modal with notification details
     setSelectedNotification({ ...notif, isRead: true });
     setIsDetailModalOpen(true);
     setIsOpen(false);
@@ -704,6 +937,15 @@ export default function NotificationBellDropdown() {
         return <CheckCircle2 size={16} className="text-indigo-600" />;
       case "ORDER_CANCELLED":
         return <AlertCircle size={16} className="text-red-600" />;
+      case "PAYMENT_RECEIVED":
+        return <DollarSign size={16} className="text-emerald-600" />;
+      case "COUPON_CREATED":
+      case "COUPON_UPDATED":
+        return <Tag size={16} className="text-purple-600" />;
+      case "COUPON_DELETED":
+        return <Tag size={16} className="text-rose-600" />;
+      case "RESTAURANT_REGISTERED":
+        return <Building2 size={16} className="text-amber-600" />;
       case "WAITER_CALL":
         return <BellRing size={16} className="text-amber-600" />;
       case "WAITER_CALL_ACK":
@@ -726,6 +968,15 @@ export default function NotificationBellDropdown() {
         return "bg-indigo-100/80 text-indigo-900 border border-indigo-200/80";
       case "ORDER_CANCELLED":
         return "bg-red-100/80 text-red-900 border border-red-200/80";
+      case "PAYMENT_RECEIVED":
+        return "bg-emerald-100 text-emerald-900 border border-emerald-300";
+      case "COUPON_CREATED":
+      case "COUPON_UPDATED":
+        return "bg-purple-100 text-purple-900 border border-purple-300";
+      case "COUPON_DELETED":
+        return "bg-rose-100 text-rose-900 border border-rose-300";
+      case "RESTAURANT_REGISTERED":
+        return "bg-amber-100 text-amber-900 border border-amber-300";
       case "WAITER_CALL":
         return "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse";
       default:
@@ -759,7 +1010,7 @@ export default function NotificationBellDropdown() {
         <DropdownMenuContent
           align="end"
           sideOffset={8}
-          className="w-[340px] sm:w-[420px] rounded-3xl p-0 bg-white/95 backdrop-blur-xl border border-stone-200/90 shadow-2xl shadow-stone-900/15 overflow-hidden z-50 animate-in fade-in-50 zoom-in-95"
+          className="w-[340px] sm:w-[440px] rounded-3xl p-0 bg-white/95 backdrop-blur-xl border border-stone-200/90 shadow-2xl shadow-stone-900/15 overflow-hidden z-50 animate-in fade-in-50 zoom-in-95"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-stone-900 via-stone-800 to-stone-900 text-white p-4 px-5">
@@ -803,12 +1054,14 @@ export default function NotificationBellDropdown() {
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center gap-1 p-1 bg-stone-950/60 rounded-xl border border-stone-700/50 text-[11px]">
+            <div className="flex items-center gap-1 p-1 bg-stone-950/60 rounded-xl border border-stone-700/50 text-[11px] overflow-x-auto">
               {(
                 [
                   { id: "ALL", label: `All (${notifications.length})` },
                   { id: "UNREAD", label: `Unread (${unreadCount})` },
                   { id: "ORDERS", label: "Orders" },
+                  { id: "PAYMENTS", label: "Payments" },
+                  { id: "COUPONS", label: "Coupons" },
                   { id: "ALERTS", label: "Alerts" },
                 ] as const
               ).map((tab) => (
@@ -816,7 +1069,7 @@ export default function NotificationBellDropdown() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 py-1 px-2 rounded-lg font-bold transition-all text-center ${activeTab === tab.id
+                  className={`flex-1 min-w-[50px] py-1 px-2 rounded-lg font-bold transition-all text-center whitespace-nowrap ${activeTab === tab.id
                     ? "bg-amber-600 text-white shadow-xs"
                     : "text-stone-400 hover:text-stone-200"
                     }`}
@@ -838,7 +1091,7 @@ export default function NotificationBellDropdown() {
                 <p className="text-stone-400 text-xs mt-0.5">
                   {activeTab === "UNREAD"
                     ? "You're all caught up! No unread alerts."
-                    : "Live orders and floor alerts will appear here."}
+                    : "Live orders, coupons, payments & tenant alerts will appear here."}
                 </p>
               </div>
             ) : (
@@ -882,18 +1135,27 @@ export default function NotificationBellDropdown() {
                       {notif.message}
                     </p>
 
-                    {/* Metadata tags: Table, Amount & Payment Status */}
+                    {/* Metadata tags: Restaurant, Table, Amount & Payment Status */}
                     <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                      {notif.metadata?.restaurantName && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-900 bg-amber-100/70 border border-amber-200/60 px-1.5 py-0.5 rounded-md truncate max-w-[150px]">
+                          <Building2 size={10} className="shrink-0" />
+                          <span className="truncate">{notif.metadata.restaurantName}</span>
+                        </span>
+                      )}
+
                       {notif.metadata?.tableNumber && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.5 rounded-md">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md">
                           <Armchair size={10} /> Table {notif.metadata.tableNumber}
                         </span>
                       )}
+
                       {notif.metadata?.totalAmount !== undefined && (
                         <span className="text-[10px] font-mono font-bold text-stone-800 bg-stone-100 px-1.5 py-0.5 rounded-md">
                           ₹{Number(notif.metadata.totalAmount).toFixed(2)}
                         </span>
                       )}
+
                       {/* Payment Status Pill */}
                       {notif.metadata?.orderNumber && (() => {
                         const paid = isOrderPaid(notif.metadata);
@@ -910,6 +1172,13 @@ export default function NotificationBellDropdown() {
                           </span>
                         );
                       })()}
+
+                      {notif.metadata?.couponCode && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-800 bg-purple-100 px-1.5 py-0.5 rounded-md">
+                          <Tag size={10} /> {notif.metadata.couponCode}
+                        </span>
+                      )}
+
                       <span className="text-[10px] text-amber-700 font-medium opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
                         Click to view →
                       </span>

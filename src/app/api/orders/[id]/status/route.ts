@@ -3,18 +3,51 @@ import { prisma } from "@/lib/prisma";
 import { OrderStatus, PaymentMethod, Prisma } from "@prisma/client";
 import { getOptionalPayload } from "@/lib/permissions";
 
-function emitOrderEvents(order: { restaurantId?: string | null }, status?: string) {
-  // @ts-expect-error - global.io is set in server.ts
-  const io = global.io;
-  if (!io) return;
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
-  const target = order.restaurantId ? io.to(`restaurant:${order.restaurantId}`) : io;
-  target.emit("order:updated", order);
+function emitOrderEvents(
+  order: {
+    id: string;
+    orderNumber?: string;
+    restaurantId?: string | null;
+    totalAmount?: unknown;
+    paymentMethod?: string | null;
+    customerName?: string;
+    customerPhone?: string;
+    table?: { tableNumber?: string | number } | null;
+    restaurant?: { name?: string } | null;
+  },
+  status?: string,
+  paymentMethod?: string
+) {
+  emitAppSocketEvent("order:updated", order, order.restaurantId);
 
   if (status === "READY") {
-    target.emit("order:ready", order);
+    emitAppSocketEvent("order:ready", order, order.restaurantId);
   } else if (status === "SERVED") {
-    target.emit("order:served", order);
+    emitAppSocketEvent("order:served", order, order.restaurantId);
+  } else if (status === "CANCELLED") {
+    emitAppSocketEvent("order:cancelled", order, order.restaurantId);
+  }
+
+  if (status === "PAID" || paymentMethod) {
+    emitAppSocketEvent(
+      "payment:received",
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount: Number(order.totalAmount || 0),
+        paymentMethod: paymentMethod || order.paymentMethod || "CASH",
+        status: "PAID",
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        tableNumber: order.table?.tableNumber,
+        restaurantId: order.restaurantId,
+        restaurantName: order.restaurant?.name,
+        timestamp: new Date().toISOString(),
+      },
+      order.restaurantId
+    );
   }
 }
 
@@ -72,6 +105,13 @@ export async function PATCH(
           },
         },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
         waiter: {
           select: {
             id: true,
@@ -82,7 +122,7 @@ export async function PATCH(
       },
     });
 
-    emitOrderEvents(order, status);
+    emitOrderEvents(order, status, paymentMethod);
 
     return NextResponse.json(order);
   } catch (error) {

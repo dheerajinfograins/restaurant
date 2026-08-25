@@ -28,6 +28,9 @@ import {
   Wallet,
   Loader2,
   DollarSign,
+  Tag,
+  Building2,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
@@ -39,11 +42,19 @@ export type NotificationType =
   | "ORDER_SERVED"
   | "ORDER_CANCELLED"
   | "ORDER_UPDATED"
+  | "PAYMENT_RECEIVED"
+  | "COUPON_CREATED"
+  | "COUPON_UPDATED"
+  | "COUPON_DELETED"
+  | "RESTAURANT_REGISTERED"
   | "WAITER_CALL"
   | "WAITER_CALL_ACK"
   | "STAFF_STATUS";
 
 export interface NotificationMetadata {
+  restaurantId?: string;
+  restaurantName?: string;
+
   orderId?: string;
   orderNumber?: string;
   tableNumber?: string;
@@ -63,12 +74,34 @@ export interface NotificationMetadata {
   notes?: string;
   waiterId?: string;
   waiterName?: string;
+
+  // Coupon metadata
+  couponId?: string;
+  couponCode?: string;
+  couponType?: string;
+  discountType?: string;
+  discountValue?: number;
+  minOrderAmount?: number;
+  maxDiscount?: number | null;
+  description?: string | null;
+
+  // Restaurant registration metadata
+  newRestaurantId?: string;
+  newRestaurantName?: string;
+  email?: string;
+  phone?: string;
+  dietaryCategory?: string;
+  city?: string | null;
+  ownerName?: string;
+  ownerEmail?: string;
+
   staffId?: string;
   staffName?: string;
   role?: string;
   isActive?: boolean;
   reason?: string;
   actionUrl?: string;
+  paymentTrace?: string;
 }
 
 export interface AppNotification {
@@ -114,6 +147,15 @@ function NotificationTypeIcon({ type }: Readonly<{ type: NotificationType }>) {
       return <CheckCircle2 className="text-indigo-600" size={22} />;
     case "ORDER_CANCELLED":
       return <AlertCircle className="text-red-600" size={22} />;
+    case "PAYMENT_RECEIVED":
+      return <DollarSign className="text-emerald-600" size={22} />;
+    case "COUPON_CREATED":
+    case "COUPON_UPDATED":
+      return <Tag className="text-purple-600" size={22} />;
+    case "COUPON_DELETED":
+      return <Tag className="text-rose-600" size={22} />;
+    case "RESTAURANT_REGISTERED":
+      return <Building2 className="text-amber-600" size={22} />;
     case "WAITER_CALL":
       return <BellRing className="text-amber-600 animate-bounce" size={22} />;
     case "WAITER_CALL_ACK":
@@ -231,6 +273,13 @@ function PaymentSection({
         </div>
       </div>
 
+      {metadata?.restaurantName && (
+        <div className="mb-2 text-xs font-semibold text-amber-900 bg-amber-100/60 px-2.5 py-1 rounded-lg border border-amber-200/50 flex items-center gap-1.5">
+          <Building2 size={13} className="text-amber-700" />
+          <span>Restaurant: {metadata.restaurantName}</span>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <span className="text-stone-500 font-medium">Selected Payment Mode:</span>
@@ -256,11 +305,10 @@ function PaymentSection({
                   key={m.key}
                   type="button"
                   onClick={() => onSelectPayMethod(m.key)}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border transition-all ${
-                    selectedPayMethod === m.key
-                      ? "bg-amber-700 text-white border-amber-700 shadow-2xs"
-                      : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
-                  }`}
+                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border transition-all ${selectedPayMethod === m.key
+                    ? "bg-amber-700 text-white border-amber-700 shadow-2xs"
+                    : "bg-white text-stone-700 border-stone-300 hover:bg-stone-100"
+                    }`}
                 >
                   {m.label}
                 </button>
@@ -302,6 +350,11 @@ function OrderDetailsSection({ metadata }: Readonly<{ metadata?: NotificationMet
         <div>
           <span className="text-[10px] uppercase font-bold text-stone-400 tracking-wider">Order ID</span>
           <p className="font-mono font-bold text-base text-stone-900">{metadata.orderNumber}</p>
+          {metadata.restaurantName && (
+            <span className="text-[10px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full inline-block mt-0.5">
+              🏢 {metadata.restaurantName}
+            </span>
+          )}
         </div>
         <div>
           <StatusBadge status={metadata.status} />
@@ -373,14 +426,127 @@ function OrderDetailsSection({ metadata }: Readonly<{ metadata?: NotificationMet
   );
 }
 
+function CouponDetailsSection({ metadata }: Readonly<{ metadata?: NotificationMetadata }>) {
+  if (!metadata?.couponCode && !metadata?.couponId) return null;
+
+  return (
+    <div className="bg-purple-50/60 border border-purple-200/80 rounded-2xl p-4 space-y-3">
+      <div className="flex items-center justify-between pb-2 border-b border-purple-200/60">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center">
+            <Tag size={16} />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase font-bold text-purple-600 tracking-wider block">
+              Promo Coupon
+            </span>
+            <span className="font-mono font-bold text-base text-purple-950">
+              {metadata.couponCode}
+            </span>
+          </div>
+        </div>
+
+        {metadata.discountValue !== undefined && (
+          <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-purple-200/80 text-purple-900 border border-purple-300">
+            {metadata.discountType === "PERCENTAGE"
+              ? `${metadata.discountValue}% OFF`
+              : `₹${metadata.discountValue} FLAT OFF`}
+          </span>
+        )}
+      </div>
+
+      {metadata.restaurantName && (
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-900">
+          <Building2 size={13} className="text-purple-700" />
+          <span>Restaurant: {metadata.restaurantName}</span>
+        </div>
+      )}
+
+      {metadata.description && (
+        <p className="text-xs text-purple-800 bg-white/70 p-2.5 rounded-xl border border-purple-100">
+          {metadata.description}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        {metadata.minOrderAmount !== undefined && (
+          <div className="bg-white/80 p-2 rounded-xl border border-purple-100">
+            <span className="text-[10px] text-stone-500 font-medium block">Min Order Value</span>
+            <span className="font-bold text-stone-900">₹{metadata.minOrderAmount}</span>
+          </div>
+        )}
+        {metadata.maxDiscount && (
+          <div className="bg-white/80 p-2 rounded-xl border border-purple-100">
+            <span className="text-[10px] text-stone-500 font-medium block">Max Discount Cap</span>
+            <span className="font-bold text-stone-900">₹{metadata.maxDiscount}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function RestaurantRegistrationSection({ metadata }: Readonly<{ metadata?: NotificationMetadata }>) {
+  if (!metadata?.newRestaurantName && !metadata?.ownerName) return null;
+
+  return (
+    <div className="bg-amber-50/70 border border-amber-200/90 rounded-2xl p-4 space-y-3">
+      <div className="flex items-center gap-2 pb-2.5 border-b border-amber-200/70">
+        <div className="w-8 h-8 rounded-xl bg-amber-700 text-white flex items-center justify-center">
+          <Building2 size={16} />
+        </div>
+        <div>
+          <span className="text-[10px] uppercase font-bold text-amber-700 tracking-wider block">
+            New Registered Tenant
+          </span>
+          <span className="font-bold text-base text-stone-900">
+            {metadata.newRestaurantName}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+        {metadata.dietaryCategory && (
+          <div className="bg-white p-2.5 rounded-xl border border-amber-100">
+            <span className="text-[10px] text-stone-400 font-medium block">Dietary Policy</span>
+            <span className="font-bold text-amber-900">{metadata.dietaryCategory.replaceAll("_", " ")}</span>
+          </div>
+        )}
+
+        {metadata.city && (
+          <div className="bg-white p-2.5 rounded-xl border border-amber-100 flex items-center gap-1.5">
+            <MapPin size={13} className="text-amber-700" />
+            <div>
+              <span className="text-[10px] text-stone-400 font-medium block">Location</span>
+              <span className="font-bold text-stone-900">{metadata.city}</span>
+            </div>
+          </div>
+        )}
+
+        {metadata.ownerName && (
+          <div className="bg-white p-2.5 rounded-xl border border-amber-100 flex items-center gap-1.5 sm:col-span-2">
+            <User size={13} className="text-amber-700" />
+            <div>
+              <span className="text-[10px] text-stone-400 font-medium block">Owner Account</span>
+              <span className="font-bold text-stone-900">
+                {metadata.ownerName} {metadata.ownerEmail ? `(${metadata.ownerEmail})` : ""}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StaffDetailsSection({ metadata }: Readonly<{ metadata?: NotificationMetadata }>) {
-  if (!metadata?.staffName) return null;
+  if (!metadata?.staffName && !metadata?.staffId) return null;
 
   return (
     <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-2 text-xs">
       <div className="flex justify-between items-center">
         <span className="text-stone-500 font-medium">Staff Member:</span>
-        <span className="font-bold text-stone-900 text-sm">{metadata.staffName}</span>
+        <span className="font-bold text-stone-900 text-sm">{metadata.staffName || "Staff User"}</span>
       </div>
       {metadata.role && (
         <div className="flex justify-between items-center">
@@ -403,9 +569,11 @@ function StaffDetailsSection({ metadata }: Readonly<{ metadata?: NotificationMet
 }
 
 function ActionNavigationButton({
+  type,
   metadata,
   onNavigate,
 }: Readonly<{
+  type: NotificationType;
   metadata?: NotificationMetadata;
   onNavigate: (url: string) => void;
 }>) {
@@ -419,6 +587,48 @@ function ActionNavigationButton({
       >
         <span>Open Section</span>
         <ArrowRight size={13} />
+      </Button>
+    );
+  }
+
+  if (type === "COUPON_CREATED" || type === "COUPON_UPDATED" || type === "COUPON_DELETED") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => onNavigate("/dashboard/coupons")}
+        className="bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold rounded-xl gap-1.5 shadow-sm"
+      >
+        <span>View Coupons</span>
+        <ExternalLink size={13} />
+      </Button>
+    );
+  }
+
+  if (type === "RESTAURANT_REGISTERED") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => onNavigate("/dashboard/restaurants")}
+        className="bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold rounded-xl gap-1.5 shadow-sm"
+      >
+        <span>View Restaurants</span>
+        <ExternalLink size={13} />
+      </Button>
+    );
+  }
+
+  if (type === "PAYMENT_RECEIVED") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        onClick={() => onNavigate("/dashboard/payments")}
+        className="bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl gap-1.5 shadow-sm"
+      >
+        <span>Payments Desk</span>
+        <ExternalLink size={13} />
       </Button>
     );
   }
@@ -567,7 +777,7 @@ export default function NotificationDetailModal({
               <NotificationTypeIcon type={type} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-500/30">
                   {type.replaceAll("_", " ")}
                 </span>
@@ -589,7 +799,7 @@ export default function NotificationDetailModal({
             {message}
           </div>
 
-          {/* 💳 DEDICATED PAYMENT STATUS SECTION */}
+          {/* 💳 DEDICATED PAYMENT STATUS SECTION (If Order Payment) */}
           <PaymentSection
             metadata={metadata}
             isPaid={isPaid}
@@ -601,6 +811,12 @@ export default function NotificationDetailModal({
 
           {/* If Order Information exists */}
           <OrderDetailsSection metadata={metadata} />
+
+          {/* If Coupon Information */}
+          <CouponDetailsSection metadata={metadata} />
+
+          {/* If New Restaurant Registration */}
+          <RestaurantRegistrationSection metadata={metadata} />
 
           {/* If Staff Change */}
           <StaffDetailsSection metadata={metadata} />
@@ -627,18 +843,7 @@ export default function NotificationDetailModal({
           </Button>
 
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleNavigate("/dashboard/payments")}
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-950 border-emerald-300 bg-emerald-50 hover:bg-emerald-100 rounded-xl gap-1"
-            >
-              <DollarSign size={13} />
-              <span>Payments Desk</span>
-            </Button>
-
-            <ActionNavigationButton metadata={metadata} onNavigate={handleNavigate} />
+            <ActionNavigationButton type={type} metadata={metadata} onNavigate={handleNavigate} />
 
             <Button
               type="button"

@@ -1,6 +1,7 @@
 import couponRepository from "./repository";
 import { CreateCouponDto, UpdateCouponDto, ValidateCouponDto, CouponValidationResult } from "./dto";
 import { AppError, HTTP_STATUS } from "@/exceptions";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 class CouponService {
   /**
@@ -40,7 +41,27 @@ class CouponService {
       throw new AppError(`A coupon with code '${data.code.toUpperCase()}' already exists for this restaurant`, HTTP_STATUS.CONFLICT);
     }
 
-    return await couponRepository.create(restaurantId, data);
+    const coupon = await couponRepository.create(restaurantId, data);
+
+    emitAppSocketEvent(
+      "coupon:created",
+      {
+        id: coupon.id,
+        code: coupon.code,
+        description: coupon.description,
+        couponType: coupon.couponType,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        minOrderAmount: coupon.minOrderAmount,
+        maxDiscount: coupon.maxDiscount,
+        restaurantId,
+        restaurantName: coupon.restaurant?.name,
+        createdAt: coupon.createdAt,
+      },
+      restaurantId
+    );
+
+    return coupon;
   }
 
   /**
@@ -63,7 +84,27 @@ class CouponService {
       }
     }
 
-    return await couponRepository.update(id, data);
+    const updatedCoupon = await couponRepository.update(id, data);
+
+    emitAppSocketEvent(
+      "coupon:updated",
+      {
+        id: updatedCoupon.id,
+        code: updatedCoupon.code,
+        description: updatedCoupon.description,
+        couponType: updatedCoupon.couponType,
+        discountType: updatedCoupon.discountType,
+        discountValue: updatedCoupon.discountValue,
+        minOrderAmount: updatedCoupon.minOrderAmount,
+        maxDiscount: updatedCoupon.maxDiscount,
+        restaurantId,
+        restaurantName: updatedCoupon.restaurant?.name,
+        updatedAt: updatedCoupon.updatedAt,
+      },
+      restaurantId
+    );
+
+    return updatedCoupon;
   }
 
   /**
@@ -79,7 +120,20 @@ class CouponService {
       throw new AppError("You can only delete coupons belonging to your restaurant", HTTP_STATUS.FORBIDDEN);
     }
 
-    return await couponRepository.delete(id);
+    const deleted = await couponRepository.delete(id);
+
+    emitAppSocketEvent(
+      "coupon:deleted",
+      {
+        id: existing.id,
+        code: existing.code,
+        restaurantId,
+        restaurantName: existing.restaurant?.name,
+      },
+      restaurantId
+    );
+
+    return deleted;
   }
 
   /**

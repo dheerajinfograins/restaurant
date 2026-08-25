@@ -6,6 +6,7 @@ import { successResponse } from "@/lib/api-response";
 import { requireRoles, getAuthenticatedRestaurantId } from "@/lib/permissions";
 import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 interface StaffUpdateBody {
   name?: unknown;
@@ -133,16 +134,15 @@ function emitStaffStatus(
   isActive: boolean,
   role: string
 ) {
-  // @ts-expect-error - global.io is set in server.ts
-  const io = global.io;
-  if (!io) return;
-
-  const target = restaurantId ? io.to(`restaurant:${restaurantId}`) : io;
-  target.emit("staff:status_changed", {
-    userId,
-    isActive,
-    role,
-  });
+  emitAppSocketEvent(
+    "staff:status_changed",
+    {
+      userId,
+      isActive,
+      role,
+    },
+    restaurantId
+  );
 }
 
 // PUT /api/staff/[id] - Update staff details

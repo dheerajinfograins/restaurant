@@ -6,6 +6,8 @@ import { OrderStatus, PaymentMethod } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { razorpay, verifyRazorpaySignature } from "@/lib/razorpay";
 
+import { emitAppSocketEvent } from "@/lib/socket-server";
+
 export async function createOrderAction(data: {
   restaurantId: string;
   tableId: string;
@@ -53,6 +55,13 @@ export async function createOrderAction(data: {
           },
         },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
       },
     });
 
@@ -64,17 +73,8 @@ export async function createOrderAction(data: {
       }).catch((err) => console.error("Failed to increment coupon count:", err));
     }
 
-    // Broadcast live to Admin, Kitchen, Waiter via Socket.io
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (order.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:new", order);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:new", order);
-      }
-    }
+    // Broadcast live to Admin, Kitchen, Waiter & Super Admin via emitAppSocketEvent
+    emitAppSocketEvent("order:new", order, order.restaurantId);
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/payments");
@@ -199,6 +199,13 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
           },
         },
         table: true,
+        restaurant: {
+          select: {
+            id: true,
+            name: true,
+            dietaryCategory: true,
+          },
+        },
       },
     });
 
@@ -210,17 +217,25 @@ export async function verifyAndCreateRazorpayOrderAction(data: {
       }).catch((err) => console.error("Failed to increment coupon count:", err));
     }
 
-    // 4. Broadcast live via Socket.io
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (order.restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${order.restaurantId}`).emit("order:new", order);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("order:new", order);
-      }
-    }
+    // 4. Broadcast live via emitAppSocketEvent
+    emitAppSocketEvent("order:new", order, order.restaurantId);
+    emitAppSocketEvent(
+      "payment:received",
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        totalAmount: Number(order.totalAmount || 0),
+        paymentMethod: order.paymentMethod,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        tableNumber: order.table?.tableNumber,
+        restaurantId: order.restaurantId,
+        restaurantName: order.restaurant?.name,
+        timestamp: new Date().toISOString(),
+        paymentTrace: data.razorpayPaymentId,
+      },
+      order.restaurantId
+    );
 
     revalidatePath("/dashboard/orders");
     revalidatePath("/dashboard/payments");

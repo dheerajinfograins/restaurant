@@ -57,6 +57,11 @@ app.prepare().then(() => {
       socket.join(`restaurant:${restaurantId}`);
     });
 
+    socket.on('join_super_admin', () => {
+      console.log(`Socket ${socket.id} joined super_admin room`);
+      socket.join('super_admin');
+    });
+
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
     });

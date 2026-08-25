@@ -20,9 +20,11 @@ export const useSocket = () => {
 export const SocketProvider = ({
   children,
   restaurantId,
+  role,
 }: {
   children: React.ReactNode;
   restaurantId?: string;
+  role?: string;
 }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -45,10 +47,15 @@ export const SocketProvider = ({
   }, []);
 
   useEffect(() => {
-    if (socket && isConnected && restaurantId) {
-      socket.emit("join_restaurant", restaurantId);
+    if (socket && isConnected) {
+      if (role === "SUPER_ADMIN") {
+        socket.emit("join_super_admin");
+      }
+      if (restaurantId) {
+        socket.emit("join_restaurant", restaurantId);
+      }
     }
-  }, [socket, isConnected, restaurantId]);
+  }, [socket, isConnected, restaurantId, role]);
 
   const value = useMemo(
     () => ({ socket, isConnected }),

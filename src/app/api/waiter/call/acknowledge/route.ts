@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getOptionalPayload } from "@/lib/permissions";
 
+import { emitAppSocketEvent } from "@/lib/socket-server";
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -41,17 +43,8 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString(),
     };
 
-    // Broadcast real-time socket event once (scoped to restaurant room or fallback to global)
-    // @ts-expect-error - global.io is set in server.ts
-    if (global.io) {
-      if (restaurantId) {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.to(`restaurant:${restaurantId}`).emit("waiter:call:acknowledged", ackPayload);
-      } else {
-        // @ts-expect-error - global.io is set in server.ts
-        global.io.emit("waiter:call:acknowledged", ackPayload);
-      }
-    }
+    // Broadcast real-time socket event once (scoped to restaurant room and super admin)
+    emitAppSocketEvent("waiter:call:acknowledged", ackPayload, restaurantId);
 
     return NextResponse.json({
       success: true,
