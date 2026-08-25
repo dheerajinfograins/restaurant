@@ -20,24 +20,26 @@ import { getKitchenHistoryAction } from "@/modules/kitchen/controller";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
+export type NumericAmount = number | string | null;
+
 export interface HistoryOrder {
   id: string;
   orderNumber: string;
-  customerName?: string;
-  customerPhone?: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
   status: OrderStatus;
   paymentMethod?: string | null;
-  totalAmount?: number;
-  createdAt: string;
-  updatedAt: string;
+  totalAmount?: NumericAmount;
+  createdAt: string | Date;
+  updatedAt?: string | Date;
   notes?: string | null;
-  table: { tableNumber: string };
-  items: Array<{
+  table?: { tableNumber?: string | number } | null;
+  items?: Array<{
     id: string;
     quantity: number;
-    unitPrice?: number;
-    totalPrice?: number;
-    product: { name: string; price?: number; foodType?: string };
+    unitPrice?: NumericAmount;
+    totalPrice?: NumericAmount;
+    product?: { name?: string; price?: number | null; foodType?: string | null } | null;
   }>;
 }
 

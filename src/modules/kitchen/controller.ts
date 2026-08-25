@@ -4,9 +4,22 @@ import { prisma } from "@/lib/prisma";
 import { getOptionalPayload } from "@/lib/permissions";
 import { OrderStatus } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { emitAppSocketEvent } from "@/lib/socket-server";
 
 function serialize<T>(data: T): T {
   return structuredClone(data);
+}
+
+function handleActionError(actionName: string, error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "digest" in error &&
+    (error as { digest?: string }).digest === "DYNAMIC_SERVER_USAGE"
+  ) {
+    throw error;
+  }
+  console.error(`Failed to ${actionName}:`, error);
 }
 
 async function resolveRestaurantId() {
@@ -51,12 +64,10 @@ export async function getActiveKitchenOrdersAction() {
 
     return { success: true, data: serialize(orders) };
   } catch (error) {
-    console.error("Failed to get kitchen orders:", error);
+    handleActionError("get kitchen orders", error);
     return { success: false, error: "Failed to fetch orders" };
   }
 }
-
-import { emitAppSocketEvent } from "@/lib/socket-server";
 
 export async function acceptOrderAction(orderId: string) {
   try {
@@ -82,7 +93,7 @@ export async function acceptOrderAction(orderId: string) {
     revalidatePath("/dashboard/orders");
     return { success: true, data: serialize(order) };
   } catch (error) {
-    console.error("Failed to accept order:", error);
+    handleActionError("accept order", error);
     return { success: false, error: "Failed to accept order" };
   }
 }
@@ -119,7 +130,7 @@ export async function markAsReadyAction(orderId: string) {
     revalidatePath("/dashboard/orders");
     return { success: true, data: serialize(order) };
   } catch (error) {
-    console.error("Failed to mark as ready:", error);
+    handleActionError("mark as ready", error);
     return { success: false, error: "Failed to mark as ready" };
   }
 }
@@ -157,7 +168,7 @@ export async function markAsServedAction(orderId: string) {
     revalidatePath("/dashboard/kitchen/history");
     return { success: true, data: serialize(order) };
   } catch (error) {
-    console.error("Failed to mark as served:", error);
+    handleActionError("mark as served", error);
     return { success: false, error: "Failed to mark as served" };
   }
 }
@@ -175,7 +186,7 @@ export async function getAllProductsAction() {
 
     return { success: true, data: serialize(products) };
   } catch (error) {
-    console.error("Failed to fetch products:", error);
+    handleActionError("fetch products", error);
     return { success: false, error: "Failed to fetch products" };
   }
 }
@@ -191,7 +202,7 @@ export async function toggleProductAvailabilityAction(productId: string, isAvail
     revalidatePath("/dashboard/menu");
     return { success: true, data: serialize(product) };
   } catch (error) {
-    console.error("Failed to toggle product availability:", error);
+    handleActionError("toggle product availability", error);
     return { success: false, error: "Failed to toggle availability" };
   }
 }
@@ -231,7 +242,7 @@ export async function getKitchenHistoryAction(timeRange: "today" | "week" | "all
 
     return { success: true, data: serialize(history) };
   } catch (error) {
-    console.error("Failed to fetch kitchen history:", error);
+    handleActionError("fetch kitchen history", error);
     return { success: false, error: "Failed to fetch history" };
   }
 }

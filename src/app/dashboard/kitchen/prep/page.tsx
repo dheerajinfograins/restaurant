@@ -1,6 +1,8 @@
 import { getAllProductsAction } from "@/modules/kitchen/controller";
 import { PrepGuideClient, Product } from "@/components/kitchen/prep-guide-client";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Prep Guide | Kitchen",
 };
