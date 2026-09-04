@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
-import { io, Socket } from "socket.io-client";
+import { useSocket } from "@/components/providers/socket-provider";
 import { isOrderPaid } from "@/lib/order-payment";
 
 interface RestaurantOption {
@@ -981,6 +981,7 @@ function EditOrderStatusDialog({
 }
 
 export function OrdersClient() {
+  const { socket } = useSocket();
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1058,25 +1059,29 @@ export function OrdersClient() {
       await fetchOrders();
     })();
 
-    // Socket.io real-time listener for instantaneous status updates across Kitchen, Waiter & Admin
-    let socket: Socket | undefined;
-    try {
-      socket = io();
-      socket.on("order:updated", () => fetchOrders());
-      socket.on("order:ready", () => fetchOrders());
-      socket.on("order:served", () => fetchOrders());
-      socket.on("order:new", () => fetchOrders());
-    } catch (err) {
-      console.warn("Socket connection failed:", err);
-    }
-
     // Live polling every 3 seconds for rock-solid sync
     const interval = setInterval(() => fetchOrders(false), 3000);
     return () => {
       clearInterval(interval);
-      if (socket) socket.disconnect();
     };
   }, [fetchOrders]);
+
+  // Real-time socket events when socket is connected
+  useEffect(() => {
+    if (!socket) return;
+    const handleUpdate = () => void fetchOrders();
+    socket.on("order:updated", handleUpdate);
+    socket.on("order:ready", handleUpdate);
+    socket.on("order:served", handleUpdate);
+    socket.on("order:new", handleUpdate);
+
+    return () => {
+      socket.off("order:updated", handleUpdate);
+      socket.off("order:ready", handleUpdate);
+      socket.off("order:served", handleUpdate);
+      socket.off("order:new", handleUpdate);
+    };
+  }, [socket, fetchOrders]);
 
   const updateOrderStatus = async (id: string, newStatus: OrderStatus) => {
     try {

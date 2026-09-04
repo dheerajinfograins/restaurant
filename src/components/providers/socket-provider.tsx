@@ -30,18 +30,35 @@ export const SocketProvider = ({
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const socketInstance = ClientIO(); // automatically connects to the host that serves the page
+    // Connect to external socket URL if configured, or current host
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "";
+
+    const socketInstance = ClientIO(socketUrl, {
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 2, // Stop aggressive polling after 2 tries if running on serverless/Vercel
+      reconnectionDelay: 5000,
+      timeout: 3500,
+      transports: ["websocket", "polling"],
+    });
 
     socketInstance.on("connect", () => {
       setSocket(socketInstance);
       setIsConnected(true);
     });
 
+    socketInstance.on("connect_error", () => {
+      setIsConnected(false);
+    });
+
     socketInstance.on("disconnect", () => {
       setIsConnected(false);
     });
 
+    setSocket(socketInstance);
+
     return () => {
+      socketInstance.removeAllListeners();
       socketInstance.disconnect();
     };
   }, []);

@@ -41,7 +41,7 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { AllTablesTurnoverModal } from "@/components/dashboard/reports/AllTablesTurnoverModal";
-import { io, Socket } from "socket.io-client";
+import { useSocket } from "@/components/providers/socket-provider";
 
 const CHART_COLORS = ["#d4af37", "#0ea5e9", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444", "#ec4899", "#14b8a6"];
 
@@ -89,6 +89,7 @@ const RANGE_OPTIONS = [
 ] as const;
 
 export function ReportsDashboard({ initialData }: Readonly<{ initialData?: ReportPayload }>) {
+  const { socket } = useSocket();
   const [data, setData] = useState<ReportPayload | null>(initialData || null);
   const [range, setRange] = useState<string>("last7");
   const [selectedRestaurant, setSelectedRestaurant] = useState<string>("all");
@@ -161,29 +162,32 @@ export function ReportsDashboard({ initialData }: Readonly<{ initialData?: Repor
 
   // Real-time live synchronization via Socket.io & 4s polling fallback
   useEffect(() => {
-    let socket: Socket | undefined;
-    try {
-      socket = io();
-      const onUpdate = () => {
-        void fetchReports(range, selectedRestaurant);
-      };
-      socket.on("order:updated", onUpdate);
-      socket.on("order:served", onUpdate);
-      socket.on("order:new", onUpdate);
-      socket.on("order:ready", onUpdate);
-    } catch (e) {
-      console.warn("Socket init skipped:", e);
-    }
-
     const interval = setInterval(() => {
       void fetchReports(range, selectedRestaurant);
     }, 4000);
 
     return () => {
       clearInterval(interval);
-      if (socket) socket.disconnect();
     };
   }, [range, selectedRestaurant, fetchReports]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onUpdate = () => {
+      void fetchReports(range, selectedRestaurant);
+    };
+    socket.on("order:updated", onUpdate);
+    socket.on("order:served", onUpdate);
+    socket.on("order:new", onUpdate);
+    socket.on("order:ready", onUpdate);
+
+    return () => {
+      socket.off("order:updated", onUpdate);
+      socket.off("order:served", onUpdate);
+      socket.off("order:new", onUpdate);
+      socket.off("order:ready", onUpdate);
+    };
+  }, [socket, range, selectedRestaurant, fetchReports]);
 
   const handlePrint = () => {
     window.print();

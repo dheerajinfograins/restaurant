@@ -46,7 +46,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { io, Socket } from "socket.io-client";
+import { useSocket } from "@/components/providers/socket-provider";
 import Link from "next/link";
 import { isOrderPaid } from "@/lib/order-payment";
 
@@ -1210,6 +1210,7 @@ function PaymentDetailsSheet({
    ========================================================================= */
 
 export function PaymentsClient() {
+  const { socket } = useSocket();
   const [orders, setOrders] = useState<PaymentOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -1304,24 +1305,27 @@ export function PaymentsClient() {
 
     void loadInitialData();
 
-    // Real-time socket sync
-    let socket: Socket | undefined;
-    try {
-      socket = io();
-      socket.on("order:updated", () => { void fetchOrders(); });
-      socket.on("order:served", () => { void fetchOrders(); });
-      socket.on("order:new", () => { void fetchOrders(); });
-    } catch (err) {
-      console.warn("Socket connection failed:", err);
-    }
-
     // Polling fallback every 3s
     const interval = setInterval(() => { void fetchOrders(); }, 3000);
     return () => {
       clearInterval(interval);
-      if (socket) socket.disconnect();
     };
   }, [fetchOrders]);
+
+  // Real-time socket sync
+  useEffect(() => {
+    if (!socket) return;
+    const handleUpdate = () => { void fetchOrders(); };
+    socket.on("order:updated", handleUpdate);
+    socket.on("order:served", handleUpdate);
+    socket.on("order:new", handleUpdate);
+
+    return () => {
+      socket.off("order:updated", handleUpdate);
+      socket.off("order:served", handleUpdate);
+      socket.off("order:new", handleUpdate);
+    };
+  }, [socket, fetchOrders]);
 
   const handleCollectPayment = async () => {
     if (!collectOrder) return;

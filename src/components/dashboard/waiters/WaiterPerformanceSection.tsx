@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import { format, formatDistanceToNow } from "date-fns";
 import {
@@ -821,6 +821,7 @@ export function WaiterPerformanceSection({ restaurantId }: Readonly<WaiterPerfor
   const [historyTargetWaiter, setHistoryTargetWaiter] = useState<{ id: string; name: string } | null>(null);
   const [callingWaiterId, setCallingWaiterId] = useState<string | null>(null);
   const [waiterAckData, setWaiterAckData] = useState<WaiterAckData | null>(null);
+  const seenAckIdsRef = useRef<Set<string>>(new Set());
 
   const handleCallWaiter = async (waiterId: string, waiterName: string) => {
     setCallingWaiterId(waiterId);
@@ -854,6 +855,27 @@ export function WaiterPerformanceSection({ restaurantId }: Readonly<WaiterPerfor
         setWaiters(res.data.waiters || []);
         if (res.data.summary) {
           setSummary(res.data.summary);
+        }
+
+        // Check if any recent call was acknowledged (works in polling without WebSockets)
+        if (Array.isArray(res.data.recentCalls)) {
+          for (const call of res.data.recentCalls) {
+            if (call.status === "ACKNOWLEDGED" && call.id && !seenAckIdsRef.current.has(call.id)) {
+              seenAckIdsRef.current.add(call.id);
+              setWaiterAckData({
+                id: call.id,
+                waiterId: call.waiterId,
+                waiterName: call.waiterName,
+                message: `${call.waiterName} acknowledged your call and is on the way! 🏃`,
+                timestamp: call.acknowledgedAt || call.timestamp,
+              });
+              toast.success(`🏃 ${call.waiterName} acknowledged your call and is on the way!`, {
+                id: `ack-${call.id}`,
+                duration: 5000,
+                icon: "✅",
+              });
+            }
+          }
         }
 
         // If drawer is open, keep selected waiter in sync

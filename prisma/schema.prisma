@@ -65,6 +65,7 @@ model Restaurant {
   categories Category[]
   orders     Order[]
   coupons    Coupon[]
+  waiterCalls WaiterCall[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,6 +94,7 @@ model User {
 
   restaurant Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders     Order[]
+  waiterCalls WaiterCall[]
 
   lastLoginAt DateTime?
 
@@ -357,5 +359,37 @@ model Coupon {
   @@unique([restaurantId, code])
   @@index([restaurantId])
   @@map("coupons")
+}
+
+// =============================
+// WAITER CALLS & ALERTS
+// =============================
+
+enum WaiterCallStatus {
+  PENDING
+  ACKNOWLEDGED
+  DISMISSED
+}
+
+model WaiterCall {
+  id             String           @id @default(cuid())
+  restaurantId   String
+  waiterId       String
+  callerName     String?          @default("Admin / Manager")
+  message        String?
+  status         WaiterCallStatus @default(PENDING)
+  acknowledgedAt DateTime?
+
+  waiter         User             @relation(fields: [waiterId], references: [id], onDelete: Cascade)
+  restaurant     Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([restaurantId])
+  @@index([waiterId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("waiter_calls")
 }
 

@@ -17,11 +17,13 @@ export interface AdminCallData {
 interface AdminCallAlertModalProps {
   readonly callData: AdminCallData | null;
   readonly onDismiss: () => void;
+  readonly onAcknowledgeSuccess?: () => void;
 }
 
 export function AdminCallAlertModal({
   callData,
   onDismiss,
+  onAcknowledgeSuccess,
 }: Readonly<AdminCallAlertModalProps>) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const chimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -108,12 +110,14 @@ export function AdminCallAlertModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          callId: callData.id,
           waiterId: callData.waiterId,
           waiterName: callData.waiterName,
           message: `${callData.waiterName || "Waiter"} acknowledged: I'm on my way to the counter! 🏃`,
         }),
       });
       toast.success("Admin notified: You're on the way! 🏃", { id: "ack-call" });
+      onAcknowledgeSuccess?.();
     } catch (err) {
       console.error("Failed to send ack:", err);
     } finally {

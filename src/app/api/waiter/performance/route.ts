@@ -213,9 +213,37 @@ export async function GET(request: Request) {
       totalRevenueToday: Math.max(totalRestaurantRevenueToday, totalWaitersRevenueToday),
     };
 
+    // Fetch recent calls and acknowledgments within the last 3 minutes for live Admin sync
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+    const recentDbCalls = await prisma.waiterCall.findMany({
+      where: {
+        ...(restaurantId ? { restaurantId } : {}),
+        createdAt: { gte: threeMinutesAgo },
+      },
+      include: {
+        waiter: {
+          select: { id: true, name: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    const recentCalls = recentDbCalls.map((c) => ({
+      id: c.id,
+      waiterId: c.waiterId,
+      waiterName: c.waiter?.name || "Waiter",
+      callerName: c.callerName || "Admin",
+      message: c.message || "",
+      status: c.status,
+      timestamp: c.createdAt.toISOString(),
+      acknowledgedAt: c.acknowledgedAt?.toISOString() || null,
+    }));
+
     return NextResponse.json({
       summary,
       waiters: waiterPerformanceData,
+      recentCalls,
     });
   } catch (error) {
     console.error("Failed to fetch waiter performance:", error);
