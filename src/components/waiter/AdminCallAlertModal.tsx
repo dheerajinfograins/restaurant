@@ -29,7 +29,7 @@ export function AdminCallAlertModal({
   const chimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isSendingAck, setIsSendingAck] = useState(false);
 
-  // Play urgent loud high-pitch alert sequence for Admin Call
+  // Play loud urgent alert chord sequence for Admin Call
   const playAlertChime = useCallback(() => {
     try {
       if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -89,10 +89,10 @@ export function AdminCallAlertModal({
     // Play immediately
     playAlertChime();
 
-    // Repeat every 2.8 seconds
+    // Repeat every 2.5 seconds
     chimeIntervalRef.current = setInterval(() => {
       playAlertChime();
-    }, 2800);
+    }, 2500);
 
     return () => {
       if (chimeIntervalRef.current) {
@@ -128,18 +128,26 @@ export function AdminCallAlertModal({
 
   if (!callData) return null;
 
-  const caller = callData.callerName || "Restaurant Admin";
+  const caller = callData.callerName || "Restaurant Admin / Owner";
   const messageText =
-    callData.message || "Admin is calling you! Please report to the counter or manager station.";
+    callData.message || "Admin is calling you! Please report to the counter or service desk immediately.";
 
   return (
-    <div
-      role="alertdialog"
-      aria-modal="true"
-      aria-label="Admin Calling Notification"
-      className="fixed top-3 sm:top-5 left-1/2 -translate-x-1/2 z-[99999] w-[94vw] max-w-md pointer-events-auto transition-all animate-in slide-in-from-top-6 fade-in duration-300"
-    >
-      <div className="bg-stone-900/95 backdrop-blur-2xl rounded-3xl border-2 border-amber-500/80 p-5 sm:p-6 shadow-2xl shadow-amber-950/80 ring-4 ring-amber-500/30 relative overflow-hidden">
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+      {/* Dark backdrop blur */}
+      <div
+        className="fixed inset-0 bg-stone-950/80 backdrop-blur-md animate-in fade-in duration-300"
+        onClick={onDismiss}
+        aria-hidden="true"
+      />
+
+      {/* Modal Dialog Card */}
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label="Admin Calling Notification"
+        className="relative z-10 w-full max-w-md bg-stone-900/95 backdrop-blur-2xl rounded-3xl border-2 border-amber-500/80 p-5 sm:p-6 shadow-2xl shadow-amber-950/80 ring-4 ring-amber-500/30 overflow-hidden animate-in zoom-in-95 duration-200"
+      >
         {/* Ambient Top Glow Line */}
         <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 animate-pulse" />
 
@@ -161,7 +169,7 @@ export function AdminCallAlertModal({
                 <Sparkles size={11} />
                 <span>Urgent Waiter Call</span>
               </div>
-              <h2 className="text-xl font-bold font-cormorant text-white leading-tight">
+              <h2 className="text-xl sm:text-2xl font-bold font-cormorant text-white leading-tight">
                 Admin Is Calling You!
               </h2>
             </div>
@@ -171,43 +179,43 @@ export function AdminCallAlertModal({
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss Call Alert"
-            className="text-stone-400 hover:text-white p-1 rounded-xl hover:bg-stone-800 transition-colors"
+            className="text-stone-400 hover:text-white p-1.5 rounded-xl hover:bg-stone-800 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Message Content Body */}
-        <div className="mt-3.5 space-y-2.5">
-          <div className="bg-stone-800/90 rounded-2xl p-3.5 border border-stone-700/80 shadow-inner">
-            <p className="text-[11px] font-semibold text-amber-300/90 flex items-center gap-1 mb-1">
-              <ShieldAlert size={12} className="text-amber-400" />
-              <span>From: {caller}</span>
+        <div className="mt-4 space-y-2.5">
+          <div className="bg-stone-800/90 rounded-2xl p-4 border border-stone-700/80 shadow-inner text-left">
+            <p className="text-[11px] font-semibold text-amber-300/90 flex items-center gap-1.5 mb-1.5">
+              <ShieldAlert size={14} className="text-amber-400 shrink-0" />
+              <span>From: <strong>{caller}</strong></span>
             </p>
-            <p className="text-xs sm:text-sm text-stone-100 font-medium leading-relaxed">
+            <p className="text-xs sm:text-sm text-stone-100 font-medium leading-relaxed italic">
               &ldquo;{messageText}&rdquo;
             </p>
           </div>
 
-          <div className="flex items-center justify-between text-[10px] text-stone-400 px-1">
+          <div className="flex items-center justify-between text-[11px] text-stone-400 px-1 pt-1">
             <span>
               {callData.timestamp
                 ? formatDistanceToNow(new Date(callData.timestamp), { addSuffix: true })
                 : "Just now"}
             </span>
-            <span className="text-amber-400 font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
-              <span>Live Calling</span>
+            <span className="text-amber-400 font-semibold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>Live Calling Alert</span>
             </span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-5 grid grid-cols-2 gap-2.5">
           <button
             type="button"
             onClick={onDismiss}
-            className="w-full py-2.5 px-3 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white font-bold text-xs rounded-xl border border-stone-700 transition-colors text-center"
+            className="w-full py-3 px-3 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white font-bold text-xs rounded-xl border border-stone-700 transition-colors text-center"
           >
             Dismiss
           </button>
@@ -216,7 +224,7 @@ export function AdminCallAlertModal({
             type="button"
             onClick={() => void handleAcknowledge()}
             disabled={isSendingAck}
-            className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-stone-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-900/40 active:scale-95 transition-all flex items-center justify-center gap-1.5 text-center"
+            className="w-full py-3 px-3 bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-stone-950 font-extrabold text-xs rounded-xl shadow-lg shadow-amber-900/40 active:scale-95 transition-all flex items-center justify-center gap-1.5 text-center"
           >
             {isSendingAck ? (
               <>

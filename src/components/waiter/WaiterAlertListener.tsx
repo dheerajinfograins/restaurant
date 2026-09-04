@@ -19,13 +19,13 @@ export function WaiterAlertListener() {
     if (!socket) return;
 
     const handleAdminCall = (data: AdminCallData) => {
-      if (!data.waiterId || data.waiterId === currentUser.id) {
+      if (!data.waiterId || !currentUser?.id || data.waiterId === currentUser.id) {
         if (data.id && dismissedCallIdsRef.current.has(data.id)) return;
 
         const now = Date.now();
         if (
           (data.id && data.id === lastCallIdRef.current) ||
-          (now - lastCallTimeRef.current < 4000 && data.waiterId === currentUser.id)
+          (now - lastCallTimeRef.current < 4000 && data.waiterId === currentUser?.id)
         ) {
           return;
         }
@@ -37,7 +37,7 @@ export function WaiterAlertListener() {
     };
 
     const handleStaffStatusChanged = (data: { userId: string; isActive: boolean }) => {
-      if (data.userId === currentUser.id && !data.isActive) {
+      if (currentUser?.id && data.userId === currentUser.id && !data.isActive) {
         toast.error(
           "Your staff account has been deactivated by administrator. Redirecting to login...",
           {
@@ -58,29 +58,33 @@ export function WaiterAlertListener() {
       socket.off("waiter:call", handleAdminCall);
       socket.off("staff:status_changed", handleStaffStatusChanged);
     };
-  }, [socket, currentUser.id]);
+  }, [socket, currentUser?.id]);
 
-  // 2. High-reliability Polling (every 2.5s) for active calls (works 100% on Vercel and serverless)
+  // 2. High-reliability Polling (every 2.0s) for active calls (works 100% on Vercel and serverless)
   useEffect(() => {
-    if (!currentUser?.id) return;
     let isCancelled = false;
 
     const checkActiveCalls = async () => {
       try {
-        const res = await fetch(
-          `/api/waiter/call?waiterId=${currentUser.id}&activeOnly=true&t=${Date.now()}`
-        );
+        const query = currentUser?.id
+          ? `?waiterId=${encodeURIComponent(currentUser.id)}&activeOnly=true`
+          : `?activeOnly=true`;
+
+        const res = await fetch(`/api/waiter/call${query}&t=${Date.now()}`);
         if (!res.ok) return;
         const json = await res.json();
         if (isCancelled) return;
 
-        if (json?.activeCall) {
-          const call: AdminCallData = json.activeCall;
-          if (call.id && !dismissedCallIdsRef.current.has(call.id)) {
+        const incomingCall: AdminCallData | null =
+          json?.activeCall ||
+          (Array.isArray(json?.calls) && json.calls.length > 0 ? json.calls[0] : null);
+
+        if (incomingCall?.id) {
+          if (!dismissedCallIdsRef.current.has(incomingCall.id)) {
             setAdminCall((prev) => {
-              if (prev && prev.id === call.id) return prev;
-              lastCallIdRef.current = call.id;
-              return call;
+              if (prev && prev.id === incomingCall.id) return prev;
+              lastCallIdRef.current = incomingCall.id;
+              return incomingCall;
             });
           }
         }
@@ -93,7 +97,7 @@ export function WaiterAlertListener() {
 
     const interval = setInterval(() => {
       void checkActiveCalls();
-    }, 2500);
+    }, 2000);
 
     return () => {
       isCancelled = true;
@@ -112,7 +116,7 @@ export function WaiterAlertListener() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             callId: adminCall.id,
-            waiterId: adminCall.waiterId || currentUser.id,
+            waiterId: adminCall.waiterId || currentUser?.id,
           }),
         });
       } catch {
@@ -120,7 +124,7 @@ export function WaiterAlertListener() {
       }
     }
     setAdminCall(null);
-  }, [adminCall, currentUser.id]);
+  }, [adminCall, currentUser?.id]);
 
   const handleAcknowledge = useCallback(() => {
     if (adminCall?.id) {

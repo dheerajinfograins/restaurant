@@ -28,7 +28,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Waiter not found" }, { status: 404 });
     }
 
-    const restaurantId = waiter.restaurantId || payload?.restaurantId;
+    let restaurantId = waiter.restaurantId || payload?.restaurantId;
+    if (!restaurantId) {
+      const defaultRest = await prisma.restaurant.findFirst({ select: { id: true } });
+      restaurantId = defaultRest?.id;
+    }
+
     if (!restaurantId) {
       return NextResponse.json({ error: "Restaurant ID not found for waiter" }, { status: 400 });
     }
@@ -77,20 +82,26 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const waiterId = searchParams.get("waiterId");
+    const rawWaiterId = searchParams.get("waiterId");
     const restaurantId = searchParams.get("restaurantId");
     const activeOnly = searchParams.get("activeOnly") !== "false";
 
-    // Calls within the last 3 minutes
-    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+    const payload = await getOptionalPayload();
+    const resolvedWaiterId =
+      rawWaiterId && rawWaiterId !== "undefined" && rawWaiterId !== "null"
+        ? rawWaiterId
+        : payload?.id;
 
-    if (waiterId) {
+    // Generous 30-minute window for pending calls to handle server clock differences
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+    if (resolvedWaiterId) {
       // Find latest pending call for this waiter
       const pendingCalls = await prisma.waiterCall.findMany({
         where: {
-          waiterId,
+          waiterId: resolvedWaiterId,
           ...(activeOnly ? { status: "PENDING" } : {}),
-          createdAt: { gte: threeMinutesAgo },
+          createdAt: { gte: thirtyMinutesAgo },
         },
         include: {
           waiter: {
@@ -119,11 +130,12 @@ export async function GET(request: Request) {
       });
     }
 
-    if (restaurantId) {
+    if (restaurantId || payload?.restaurantId) {
+      const targetRestaurantId = restaurantId || payload?.restaurantId;
       const recentCalls = await prisma.waiterCall.findMany({
         where: {
-          restaurantId,
-          createdAt: { gte: threeMinutesAgo },
+          ...(targetRestaurantId ? { restaurantId: targetRestaurantId } : {}),
+          createdAt: { gte: thirtyMinutesAgo },
         },
         include: {
           waiter: {
@@ -151,7 +163,7 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, calls: [] });
+    return NextResponse.json({ success: true, calls: [], activeCall: null });
   } catch (error) {
     console.error("Failed to fetch waiter calls:", error);
     return NextResponse.json(
